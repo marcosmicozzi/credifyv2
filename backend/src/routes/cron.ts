@@ -37,6 +37,7 @@ const validateCronSecret: RequestHandler = (req, res, next) => {
 
 /**
  * POST /api/cron/sync/all?secret=...
+ * GET /api/cron/sync/all?secret=...
  * 
  * Syncs metrics for all users with integrations:
  * - YouTube: syncs all YouTube projects (uses API key, no OAuth required)
@@ -44,8 +45,9 @@ const validateCronSecret: RequestHandler = (req, res, next) => {
  * 
  * This endpoint is called by AWS Lambda on a daily schedule.
  * It does NOT require user authentication - only CRON_SECRET validation.
+ * Supports both GET and POST methods for compatibility with different cron services.
  */
-cronRouter.post('/sync/all', validateCronSecret, async (req, res) => {
+const syncAllHandler: RequestHandler = async (req, res) => {
   const startTime = Date.now()
   const syncStartTime = new Date().toISOString()
 
@@ -197,5 +199,9 @@ cronRouter.post('/sync/all', validateCronSecret, async (req, res) => {
       results,
     })
   }
-})
+}
+
+// Register the handler for both GET and POST methods
+cronRouter.get('/sync/all', validateCronSecret, syncAllHandler)
+cronRouter.post('/sync/all', validateCronSecret, syncAllHandler)
 
