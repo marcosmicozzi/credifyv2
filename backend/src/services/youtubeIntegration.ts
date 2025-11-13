@@ -121,10 +121,8 @@ export function mapTokensToStore(tokens: {
 
 export async function exchangeYouTubeAuthCode(code: string) {
   const client = createYouTubeOAuthClient()
-  const { tokens } = await client.getToken({
-    code,
-    redirect_uri: env.YOUTUBE_OAUTH_REDIRECT_URI,
-  })
+  const response = await client.getToken(code);
+  const tokens = response.tokens;
 
   client.setCredentials(tokens)
 
@@ -266,9 +264,9 @@ async function ensureFreshAccessToken(userId: string, client: OAuth2Client, stor
   }
 
   client.setCredentials({
-    access_token: storedToken.access_token ?? undefined,
-    refresh_token: storedToken.refresh_token ?? undefined,
-    expiry_date: storedToken.expires_at ? new Date(storedToken.expires_at).getTime() : undefined,
+    access_token: tokens?.access_token || "",
+    refresh_token: tokens?.refresh_token ?? null,
+    expiry_date: tokens?.expiry_date ?? 0,
   })
 
   if (!storedToken.refresh_token) {
@@ -420,7 +418,7 @@ export async function syncYouTubeMetricsForUser(userId: string): Promise<SyncRes
 
   const youtubeVideoIds =
     assignments
-      ?.filter((row: { p_id: string; projects: { p_platform: string } | null }) => row.projects?.p_platform === 'youtube')
+      ?.filter((row: any) => row.projects?.p_platform === 'youtube')
       .map((row: { p_id: string }) => row.p_id) ?? []
 
   if (!youtubeVideoIds.length) {
