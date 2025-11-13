@@ -57,6 +57,31 @@ export function DashboardPage() {
 
   const totalProjects = useMemo(() => projects?.length ?? 0, [projects])
 
+  // Filter, sort, and limit projects by platform (top 6 newest)
+  const youtubeProjects = useMemo(() => {
+    if (!projects) return []
+    return projects
+      .filter((project) => project.platform === 'youtube')
+      .sort((a, b) => {
+        const dateA = a.postedAt ? new Date(a.postedAt).getTime() : 0
+        const dateB = b.postedAt ? new Date(b.postedAt).getTime() : 0
+        return dateB - dateA // Descending (newest first)
+      })
+      .slice(0, 6)
+  }, [projects])
+
+  const instagramProjects = useMemo(() => {
+    if (!projects) return []
+    return projects
+      .filter((project) => project.platform === 'instagram')
+      .sort((a, b) => {
+        const dateA = a.postedAt ? new Date(a.postedAt).getTime() : 0
+        const dateB = b.postedAt ? new Date(b.postedAt).getTime() : 0
+        return dateB - dateA // Descending (newest first)
+      })
+      .slice(0, 6)
+  }, [projects])
+
   // Extract unique collaborators from projects
   const collaborators = useMemo(() => {
     if (!projects || projects.length === 0) {
@@ -280,15 +305,16 @@ export function DashboardPage() {
         </aside>
       </section>
 
+      {/* YouTube Projects Card */}
       <section className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-8">
         <header className="mb-6 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight text-white">Your Projects</h2>
+            <h2 className="text-lg font-semibold tracking-tight text-white">My YouTube Projects</h2>
             <p className="text-xs text-slate-500">Syncs directly from Supabase via the protected API.</p>
           </div>
-          {projects && (
+          {youtubeProjects.length > 0 && (
             <span className="text-xs uppercase tracking-[0.28em] text-slate-500">
-              {projects.length} linked {projects.length === 1 ? 'project' : 'projects'}
+              {youtubeProjects.length} linked {youtubeProjects.length === 1 ? 'project' : 'projects'}
             </span>
           )}
         </header>
@@ -301,12 +327,103 @@ export function DashboardPage() {
             {projectListState.message}
           </p>
         )}
-        {projectListState.type === 'empty' && (
-          <p className="text-sm text-slate-400">{projectListState.message}</p>
+        {projectListState.type === 'ready' && youtubeProjects.length === 0 && (
+          <p className="text-sm text-slate-400">No YouTube projects linked yet.</p>
         )}
-        {projectListState.type === 'ready' && projects && (
+        {projectListState.type === 'ready' && youtubeProjects.length > 0 && (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {projects.slice(0, 6).map((project) => (
+            {youtubeProjects.map((project) => (
+              <article
+                key={project.id}
+                className="group overflow-hidden rounded-xl border border-slate-800/70 bg-slate-950/40 transition-all hover:border-slate-700/70 hover:bg-slate-950/60"
+              >
+                <div className="relative aspect-video w-full overflow-hidden bg-slate-900">
+                  {project.thumbnailUrl ? (
+                    <img
+                      src={project.thumbnailUrl}
+                      alt={project.title ?? 'Project thumbnail'}
+                      className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.style.display = 'none'
+                      }}
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center">
+                      <svg
+                        className="h-12 w-12 text-slate-700"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                        />
+                      </svg>
+                    </div>
+                  )}
+                  <div className="absolute right-2 top-2 rounded-md border border-slate-800/70 bg-slate-950/80 px-2 py-1 text-[0.65rem] uppercase tracking-[0.1em] text-slate-400 backdrop-blur-sm">
+                    {project.platform.toUpperCase()}
+                  </div>
+                </div>
+                <div className="p-4">
+                  <h3 className="line-clamp-2 text-sm font-semibold text-white">
+                    {project.title ?? project.link}
+                  </h3>
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center rounded-full border border-slate-800/70 bg-slate-900/50 px-2 py-0.5 text-xs text-slate-400">
+                        {project.assignment?.roleName ?? project.assignment?.customRole ?? 'Unassigned'}
+                      </span>
+                    </div>
+                    <span className="text-xs text-slate-500">
+                      {project.createdAt
+                        ? new Date(project.createdAt).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })
+                        : '—'}
+                    </span>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Instagram Projects Card */}
+      <section className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-8">
+        <header className="mb-6 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight text-white">My Instagram Projects</h2>
+            <p className="text-xs text-slate-500">Syncs directly from Supabase via the protected API.</p>
+          </div>
+          {instagramProjects.length > 0 && (
+            <span className="text-xs uppercase tracking-[0.28em] text-slate-500">
+              {instagramProjects.length} linked {instagramProjects.length === 1 ? 'project' : 'projects'}
+            </span>
+          )}
+        </header>
+
+        {projectListState.type === 'loading' && (
+          <p className="text-sm text-slate-400">Loading projects…</p>
+        )}
+        {projectListState.type === 'error' && (
+          <p className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+            {projectListState.message}
+          </p>
+        )}
+        {projectListState.type === 'ready' && instagramProjects.length === 0 && (
+          <p className="text-sm text-slate-400">No Instagram projects linked yet.</p>
+        )}
+        {projectListState.type === 'ready' && instagramProjects.length > 0 && (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {instagramProjects.map((project) => (
               <article
                 key={project.id}
                 className="group overflow-hidden rounded-xl border border-slate-800/70 bg-slate-950/40 transition-all hover:border-slate-700/70 hover:bg-slate-950/60"
