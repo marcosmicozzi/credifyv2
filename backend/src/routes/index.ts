@@ -31,9 +31,6 @@ apiRouter.use('/metrics', metricsRouter)
 apiRouter.use('/roles', rolesRouter)
 apiRouter.use('/integrations', integrationsRouter)
 
-apiRouter.get('/auth/instagram', notImplemented('Instagram OAuth initiation pending implementation'))
-apiRouter.get('/auth/instagram/callback', notImplemented('Instagram OAuth callback pending implementation'))
-
 apiRouter.get('/insights/fetch', notImplemented('Metrics fetch pending implementation'))
 apiRouter.post('/insights/refresh', notImplemented('Metrics refresh pending implementation'))
 

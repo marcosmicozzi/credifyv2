@@ -1,4 +1,5 @@
 import { useAuth } from '../../providers/AuthProvider'
+import { InstagramIntegrationCard } from '../settings/InstagramIntegrationCard'
 
 export function ProfilePage() {
   const { user } = useAuth()
@@ -12,9 +13,6 @@ export function ProfilePage() {
             Verify identity, manage brand-safe credentials, and view Instagram linkage status.
           </p>
         </div>
-        <button className="inline-flex items-center justify-center rounded-full border border-slate-700/80 px-4 py-2 text-xs font-medium uppercase tracking-[0.25em] text-slate-300 transition-colors hover:bg-slate-800/80">
-          Refresh Status
-        </button>
       </header>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
@@ -36,18 +34,9 @@ export function ProfilePage() {
           </dl>
         </article>
 
-        <article className="flex flex-col gap-4 rounded-xl border border-slate-800/70 bg-slate-950/50 p-6">
-          <h2 className="text-lg font-semibold text-white">Instagram Connection</h2>
-          <div className="rounded-lg border border-slate-800/80 bg-slate-900/60 p-4">
-            <p className="text-sm text-slate-400">OAuth handshake not yet configured in CredifyV2.</p>
-            <p className="mt-3 text-xs uppercase tracking-[0.25em] text-slate-500">
-              Migration is in progress; this page will handle the flow soon.
-            </p>
-          </div>
-          <button className="inline-flex items-center justify-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-200">
-            Link Instagram
-          </button>
-        </article>
+        <div className="lg:col-span-1">
+          <InstagramIntegrationCard />
+        </div>
       </div>
     </section>
   )
