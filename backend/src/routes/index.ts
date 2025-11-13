@@ -2,6 +2,7 @@ import type { RequestHandler } from 'express'
 import { Router } from 'express'
 
 import { authRouter } from './auth.js'
+import { cronRouter } from './cron.js'
 import { healthRouter } from './health.js'
 import { metricsRouter } from './metrics.js'
 import { projectsRouter } from './projects.js'
@@ -30,6 +31,8 @@ apiRouter.use('/projects', projectsRouter)
 apiRouter.use('/metrics', metricsRouter)
 apiRouter.use('/roles', rolesRouter)
 apiRouter.use('/integrations', integrationsRouter)
+// Cron routes do NOT require authentication - they use CRON_SECRET validation instead
+apiRouter.use('/cron', cronRouter)
 
 apiRouter.get('/insights/fetch', notImplemented('Metrics fetch pending implementation'))
 apiRouter.post('/insights/refresh', notImplemented('Metrics refresh pending implementation'))

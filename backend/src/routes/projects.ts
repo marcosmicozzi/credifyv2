@@ -762,6 +762,241 @@ projectsRouter.post('/claim/youtube', projectCreationRateLimiter, async (req, re
   }
 })
 
+const updateProjectSchema = z.object({
+  assignment: projectAssignmentSchema,
+})
+
+projectsRouter.patch('/:projectId', async (req, res, next) => {
+  try {
+    if (!req.auth) {
+      res.status(500).json({
+        error: 'AuthContextMissing',
+        message: 'Authentication context is not available on the request.',
+      })
+      return
+    }
+
+    if (!supabaseAdmin) {
+      const error = new Error('Supabase admin client is not configured. Check SUPABASE_SERVICE_ROLE_KEY.')
+      error.name = 'ConfigurationError'
+      ;(error as { status?: number }).status = 500
+      throw error
+    }
+
+    const params = projectIdParamsSchema.parse(req.params)
+    const payload = updateProjectSchema.parse(req.body ?? {})
+
+    // Verify user has access to this project
+    const supabase = createSupabaseUserClient(req.auth.token)
+    const accessCheck = await supabase
+      .from('user_projects')
+      .select('up_id')
+      .eq('u_id', req.auth.userId)
+      .eq('p_id', params.projectId)
+      .maybeSingle()
+
+    if (accessCheck.error || !accessCheck.data) {
+      res.status(404).json({
+        error: 'ProjectNotFound',
+        message: 'Project not found or you do not have access.',
+      })
+      return
+    }
+
+    // Update user_projects record
+    const assignment = payload.assignment ?? null
+    const updateResult = await supabaseAdmin
+      .from('user_projects')
+      .update({
+        role_id: assignment?.roleId ?? null,
+        u_role: assignment?.customRole ?? null,
+      })
+      .eq('u_id', req.auth.userId)
+      .eq('p_id', params.projectId)
+      .select(
+        `
+        u_role,
+        role_id,
+        roles(
+          role_name,
+          category
+        )
+      `,
+      )
+      .single()
+
+    if (updateResult.error) {
+      const wrapped = new Error(`Failed to update project: ${updateResult.error.message}`)
+      wrapped.name = 'SupabaseMutationError'
+      ;(wrapped as { cause?: unknown }).cause = updateResult.error
+      throw wrapped
+    }
+
+    // Fetch updated project
+    const updatedProject = await supabase
+      .from('projects')
+      .select(
+        `
+        p_id,
+        p_title,
+        p_description,
+        p_link,
+        p_platform,
+        p_channel,
+        p_posted_at,
+        p_thumbnail_url,
+        p_created_at,
+        user_projects!inner(
+          u_role,
+          role_id,
+          roles(
+            role_name,
+            category
+          )
+        )
+      `,
+      )
+      .eq('user_projects.u_id', req.auth.userId)
+      .eq('p_id', params.projectId)
+      .maybeSingle()
+
+    if (updatedProject.error) {
+      const wrapped = new Error(`Failed to load updated project: ${updatedProject.error.message}`)
+      wrapped.name = 'SupabaseQueryError'
+      ;(wrapped as { cause?: unknown }).cause = updatedProject.error
+      throw wrapped
+    }
+
+    const parsed = projectRowSchema.safeParse(updatedProject.data)
+
+    if (!parsed.success) {
+      const error = new Error('Updated project payload failed validation.')
+      error.name = 'SupabaseDataValidationError'
+      ;(error as { details?: unknown }).details = parsed.error.flatten()
+      throw error
+    }
+
+    const assignmentRow = parsed.data.user_projects.at(0)
+
+    res.json({
+      project: {
+        id: parsed.data.p_id,
+        title: parsed.data.p_title,
+        description: parsed.data.p_description,
+        link: parsed.data.p_link,
+        platform: parsed.data.p_platform,
+        channel: parsed.data.p_channel,
+        postedAt: parsed.data.p_posted_at,
+        thumbnailUrl: parsed.data.p_thumbnail_url,
+        createdAt: parsed.data.p_created_at,
+        assignment: assignmentRow
+          ? {
+              roleId: assignmentRow.role_id,
+              roleName: assignmentRow.roles?.role_name ?? null,
+              roleCategory: assignmentRow.roles?.category ?? null,
+              customRole: assignmentRow.u_role,
+            }
+          : null,
+      },
+    })
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        error: 'ValidationError',
+        message: 'Invalid update payload.',
+        details: error.flatten(),
+      })
+      return
+    }
+
+    next(error)
+  }
+})
+
+projectsRouter.delete('/:projectId', async (req, res, next) => {
+  try {
+    if (!req.auth) {
+      res.status(500).json({
+        error: 'AuthContextMissing',
+        message: 'Authentication context is not available on the request.',
+      })
+      return
+    }
+
+    if (!supabaseAdmin) {
+      const error = new Error('Supabase admin client is not configured. Check SUPABASE_SERVICE_ROLE_KEY.')
+      error.name = 'ConfigurationError'
+      ;(error as { status?: number }).status = 500
+      throw error
+    }
+
+    const params = projectIdParamsSchema.parse(req.params)
+
+    // Verify user has access to this project
+    const supabase = createSupabaseUserClient(req.auth.token)
+    const accessCheck = await supabase
+      .from('user_projects')
+      .select('up_id')
+      .eq('u_id', req.auth.userId)
+      .eq('p_id', params.projectId)
+      .maybeSingle()
+
+    if (accessCheck.error || !accessCheck.data) {
+      res.status(404).json({
+        error: 'ProjectNotFound',
+        message: 'Project not found or you do not have access.',
+      })
+      return
+    }
+
+    // Check if this is a YouTube project (only YouTube projects can be deleted)
+    const projectCheck = await supabaseAdmin
+      .from('projects')
+      .select('p_platform')
+      .eq('p_id', params.projectId)
+      .maybeSingle()
+
+    if (projectCheck.error || !projectCheck.data) {
+      res.status(404).json({
+        error: 'ProjectNotFound',
+        message: 'Project not found.',
+      })
+      return
+    }
+
+    if (projectCheck.data.p_platform !== 'youtube') {
+      res.status(400).json({
+        error: 'InvalidOperation',
+        message: 'Only YouTube projects can be deleted.',
+      })
+      return
+    }
+
+    // Delete the project (cascades will remove user_projects and metrics)
+    const deleteResult = await supabaseAdmin.from('projects').delete().eq('p_id', params.projectId)
+
+    if (deleteResult.error) {
+      const wrapped = new Error(`Failed to delete project: ${deleteResult.error.message}`)
+      wrapped.name = 'SupabaseMutationError'
+      ;(wrapped as { cause?: unknown }).cause = deleteResult.error
+      throw wrapped
+    }
+
+    res.status(204).send()
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        error: 'ValidationError',
+        message: 'Invalid project identifier.',
+        details: error.flatten(),
+      })
+      return
+    }
+
+    next(error)
+  }
+})
+
 export { projectsRouter }
 
 

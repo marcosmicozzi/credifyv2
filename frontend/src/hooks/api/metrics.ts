@@ -11,6 +11,7 @@ export type MetricsSummary = {
   averageEngagementRate: number
   updatedAt: string | null
   viewGrowth24hPercent: number | null
+  followerCount: number | null
 }
 
 type MetricsSummaryResponse = {
@@ -160,6 +161,48 @@ export function usePlatformMetrics({ platform, limit }: PlatformMetricsParams) {
 
       const response = await apiRequest<PlatformMetricsResponse>(
         `/api/metrics/platform/${platform}${query.toString() ? `?${query.toString()}` : ''}`,
+        {
+          accessToken,
+        },
+      )
+
+      return response
+    },
+  })
+}
+
+export type InstagramAccountInsightsResponse = {
+  platform: 'instagram'
+  metric: 'follower_count' | 'reach' | 'profile_views' | 'accounts_engaged'
+  insights: Array<{
+    fetchedAt: string
+    value: number
+  }>
+}
+
+export type InstagramAccountInsightsParams = {
+  metric?: 'follower_count' | 'reach' | 'profile_views' | 'accounts_engaged'
+  limit?: number
+}
+
+export function useInstagramAccountInsights({ metric, limit, enabled }: InstagramAccountInsightsParams & { enabled?: boolean }) {
+  const { status: authStatus, session } = useAuth()
+  const accessToken = session?.accessToken ?? null
+
+  return useQuery({
+    queryKey: ['metrics', 'instagram', 'account-insights', { metric, limit }],
+    enabled: (enabled !== false) && authStatus === 'authenticated' && Boolean(accessToken),
+    queryFn: async () => {
+      const query = new URLSearchParams()
+      if (metric) {
+        query.set('metric', metric)
+      }
+      if (typeof limit === 'number') {
+        query.set('limit', String(limit))
+      }
+
+      const response = await apiRequest<InstagramAccountInsightsResponse>(
+        `/api/metrics/platform/instagram/account-insights${query.toString() ? `?${query.toString()}` : ''}`,
         {
           accessToken,
         },

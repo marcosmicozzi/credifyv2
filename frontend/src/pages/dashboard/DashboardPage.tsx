@@ -1,8 +1,12 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 import { useMetricsSummary, useRefreshMetrics } from '../../hooks/api/metrics'
-import { useProjects } from '../../hooks/api/projects'
+import { useProjects, type Project } from '../../hooks/api/projects'
 import { useAuth } from '../../providers/AuthProvider'
+import { DeleteProjectConfirmation } from './DeleteProjectConfirmation'
+import { EditProjectModal } from './EditProjectModal'
+import { ProjectKebabMenu } from './ProjectKebabMenu'
 
 const compactNumber = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 })
 const wholeNumber = new Intl.NumberFormat('en-US')
@@ -41,11 +45,15 @@ export function DashboardPage() {
   const { session } = useAuth()
   const isDemo = session?.type === 'demo'
 
+  const [editingProject, setEditingProject] = useState<Project | null>(null)
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null)
+
   const {
     data: projects,
     isLoading: projectsLoading,
     isError: projectsErrored,
     error: projectsError,
+    refetch: refetchProjects,
   } = useProjects()
   const {
     data: summary,
@@ -309,7 +317,12 @@ export function DashboardPage() {
       <section className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-8">
         <header className="mb-6 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight text-white">My YouTube Projects</h2>
+            <Link
+              to="/projects?platform=youtube"
+              className="text-lg font-semibold tracking-tight text-white transition hover:text-emerald-400"
+            >
+              My YouTube Projects
+            </Link>
             <p className="text-xs text-slate-500">Syncs directly from Supabase via the protected API.</p>
           </div>
           {youtubeProjects.length > 0 && (
@@ -365,8 +378,15 @@ export function DashboardPage() {
                       </svg>
                     </div>
                   )}
-                  <div className="absolute right-2 top-2 rounded-md border border-slate-800/70 bg-slate-950/80 px-2 py-1 text-[0.65rem] uppercase tracking-[0.1em] text-slate-400 backdrop-blur-sm">
-                    {project.platform.toUpperCase()}
+                  <div className="absolute right-2 top-2 flex items-center gap-2">
+                    <div className="rounded-md border border-slate-800/70 bg-slate-950/80 px-2 py-1 text-[0.65rem] uppercase tracking-[0.1em] text-slate-400 backdrop-blur-sm">
+                      {project.platform.toUpperCase()}
+                    </div>
+                    <ProjectKebabMenu
+                      project={project}
+                      onEdit={() => setEditingProject(project)}
+                      onDelete={() => setDeletingProject(project)}
+                    />
                   </div>
                 </div>
                 <div className="p-4">
@@ -400,7 +420,12 @@ export function DashboardPage() {
       <section className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-8">
         <header className="mb-6 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight text-white">My Instagram Projects</h2>
+            <Link
+              to="/projects?platform=instagram"
+              className="text-lg font-semibold tracking-tight text-white transition hover:text-emerald-400"
+            >
+              My Instagram Projects
+            </Link>
             <p className="text-xs text-slate-500">Syncs directly from Supabase via the protected API.</p>
           </div>
           {instagramProjects.length > 0 && (
@@ -548,6 +573,24 @@ export function DashboardPage() {
           </div>
         )}
       </section>
+
+      <EditProjectModal
+        isOpen={editingProject !== null}
+        onClose={() => setEditingProject(null)}
+        project={editingProject}
+        onSuccess={() => {
+          void refetchProjects()
+        }}
+      />
+
+      <DeleteProjectConfirmation
+        isOpen={deletingProject !== null}
+        onClose={() => setDeletingProject(null)}
+        project={deletingProject}
+        onSuccess={() => {
+          void refetchProjects()
+        }}
+      />
     </>
   )
 }

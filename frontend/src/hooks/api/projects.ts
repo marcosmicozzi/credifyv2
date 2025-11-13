@@ -145,4 +145,66 @@ export function useClaimYouTubeProject() {
   })
 }
 
+export type UpdateProjectInput = {
+  assignment?: {
+    roleId?: number | null
+    customRole?: string | null
+  }
+}
+
+export function useUpdateProject() {
+  const queryClient = useQueryClient()
+  const { status: authStatus, session } = useAuth()
+  const accessToken = session?.accessToken ?? null
+
+  return useMutation({
+    mutationFn: async ({ projectId, input }: { projectId: string; input: UpdateProjectInput }) => {
+      if (authStatus !== 'authenticated' || !accessToken) {
+        throw new ApiError(401, 'Authentication required to update projects.', null)
+      }
+
+      const response = await apiRequest<ProjectResponse>(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+        accessToken,
+      })
+
+      return response.project
+    },
+    onSuccess: (project) => {
+      void queryClient.invalidateQueries({ queryKey: projectsQueryKey })
+      void queryClient.setQueryData<Project[]>(projectsQueryKey, (previous) =>
+        previous ? previous.map((p) => (p.id === project.id ? project : p)) : [project],
+      )
+    },
+  })
+}
+
+export function useDeleteProject() {
+  const queryClient = useQueryClient()
+  const { status: authStatus, session } = useAuth()
+  const accessToken = session?.accessToken ?? null
+
+  return useMutation({
+    mutationFn: async (projectId: string) => {
+      if (authStatus !== 'authenticated' || !accessToken) {
+        throw new ApiError(401, 'Authentication required to delete projects.', null)
+      }
+
+      await apiRequest(`/api/projects/${projectId}`, {
+        method: 'DELETE',
+        accessToken,
+      })
+
+      return projectId
+    },
+    onSuccess: (projectId) => {
+      void queryClient.invalidateQueries({ queryKey: projectsQueryKey })
+      void queryClient.setQueryData<Project[]>(projectsQueryKey, (previous) =>
+        previous ? previous.filter((p) => p.id !== projectId) : [],
+      )
+    },
+  })
+}
+
 

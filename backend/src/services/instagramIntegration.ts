@@ -59,6 +59,7 @@ type InstagramPageResponse = {
 type InstagramAccountResponse = {
   id: string
   username: string
+  followers_count?: number
 }
 
 type InstagramInsightsResponse = {
@@ -445,7 +446,39 @@ export async function syncInstagramMetricsForUser(userId: string): Promise<SyncR
       end_time: string
     }> = []
 
-    const metrics = ['reach', 'profile_views', 'accounts_engaged', 'follower_count'] as const
+    // Fetch follower_count from the account object (not from insights endpoint)
+    try {
+      const accountUrl = `${INSTAGRAM_GRAPH_API_BASE}/${accountId}`
+      const accountParams = new URLSearchParams({
+        fields: 'id,username,followers_count',
+        access_token: accessToken,
+      })
+
+      const accountResponse = await fetch(`${accountUrl}?${accountParams.toString()}`)
+
+      if (accountResponse.ok) {
+        const accountData = (await accountResponse.json()) as InstagramAccountResponse
+
+        if (typeof accountData.followers_count === 'number' && !Number.isNaN(accountData.followers_count)) {
+          const now = new Date().toISOString()
+          insightRows.push({
+            u_id: userId,
+            account_id: accountId,
+            metric: 'follower_count',
+            value: accountData.followers_count,
+            end_time: now,
+          })
+        }
+      } else {
+        const errorText = await accountResponse.text()
+        console.warn(`Failed to fetch account followers_count: ${accountResponse.status} ${errorText}`)
+      }
+    } catch (accountError) {
+      console.warn('Failed to fetch account followers_count:', accountError)
+    }
+
+    // Fetch other insights metrics (reach, profile_views, accounts_engaged)
+    const metrics = ['reach', 'profile_views', 'accounts_engaged'] as const
     const since = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000)
     const until = Math.floor(Date.now() / 1000)
 
@@ -454,8 +487,9 @@ export async function syncInstagramMetricsForUser(userId: string): Promise<SyncR
         const insightsUrl = `${INSTAGRAM_GRAPH_API_BASE}/${accountId}/insights`
         const insightsParams = new URLSearchParams({
           metric,
-          period: metric === 'follower_count' ? 'lifetime' : 'day',
-          ...(metric !== 'follower_count' ? { since: String(since), until: String(until) } : {}),
+          period: 'day',
+          since: String(since),
+          until: String(until),
           access_token: accessToken,
         })
 

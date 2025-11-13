@@ -19,6 +19,7 @@ const envSchema = z.object({
   YOUTUBE_CLIENT_ID: z.string().optional(),
   YOUTUBE_CLIENT_SECRET: z.string().optional(),
   YOUTUBE_OAUTH_REDIRECT_URI: z.string().url().optional(),
+  CRON_SECRET: z.string().min(1, 'CRON_SECRET is required for cron-based sync endpoints'),
 })
 
 const parsed = envSchema.safeParse(process.env)

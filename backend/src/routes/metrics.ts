@@ -47,6 +47,7 @@ type AggregatedSummary = {
   averageEngagementRate: number
   updatedAt: string | null
   viewGrowth24hPercent: number | null
+  followerCount: number | null
 }
 
 const isZeroSummary = (summary: AggregatedSummary | null) => {
@@ -229,6 +230,7 @@ async function computeAggregatedSummary(
     averageEngagementRate,
     updatedAt,
     viewGrowth24hPercent: null,
+    followerCount: null,
   }
 }
 
@@ -387,6 +389,7 @@ async function loadMetricsSummary(
         averageEngagementRate: parsed.avg_engagement_rate ?? 0,
         updatedAt: parsed.updated_at ?? null,
         viewGrowth24hPercent: null,
+        followerCount: null,
       }
     : null
 
@@ -395,6 +398,34 @@ async function loadMetricsSummary(
     const aggregated = await computeAggregatedSummary(supabase, projectIds, platform)
     if (aggregated) {
       summary = aggregated
+    }
+  }
+
+  // Fetch Instagram follower count if platform is Instagram
+  let followerCount: number | null = null
+  if (platform === 'instagram') {
+    const { data: followerData, error: followerError } = await supabase
+      .from('instagram_account_latest_metrics')
+      .select('value')
+      .eq('u_id', userId)
+      .eq('metric', 'follower_count')
+      .maybeSingle()
+
+    if (followerError) {
+      console.warn(`Failed to fetch Instagram follower count for user ${userId}:`, followerError)
+    } else if (followerData && followerData.value !== null && followerData.value !== undefined) {
+      // PostgreSQL numeric type may be returned as string, so parse it
+      const numericValue = typeof followerData.value === 'number' 
+        ? followerData.value 
+        : Number.parseFloat(String(followerData.value))
+      
+      if (!Number.isNaN(numericValue) && Number.isFinite(numericValue)) {
+        followerCount = numericValue
+      } else {
+        console.warn(`Invalid follower count value for user ${userId}:`, followerData.value)
+      }
+    } else {
+      console.warn(`No follower count data found for user ${userId} (platform: ${platform})`)
     }
   }
 
@@ -407,6 +438,7 @@ async function loadMetricsSummary(
       averageEngagementRate: 0,
       updatedAt: null,
       viewGrowth24hPercent: null,
+      followerCount: null,
     }
 
   const viewGrowth24hPercent = await computeViewGrowth24hPercent(supabase, projectIds)
@@ -414,6 +446,7 @@ async function loadMetricsSummary(
   return {
     ...baseSummary,
     viewGrowth24hPercent,
+    followerCount,
   }
 }
 
@@ -1004,6 +1037,102 @@ metricsRouter.get('/platform/:platform', async (req, res, next) => {
     const result = await loadPlatformMetrics(supabase, req.auth.userId, params.platform, limit)
 
     res.json(result)
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        error: 'ValidationError',
+        message: 'Invalid request parameters.',
+        details: error.flatten(),
+      })
+      return
+    }
+
+    next(error)
+  }
+})
+
+async function loadInstagramAccountInsights(
+  supabase: ReturnType<typeof createSupabaseUserClient>,
+  userId: string,
+  metric: 'follower_count' | 'reach' | 'profile_views' | 'accounts_engaged',
+  limit: number,
+) {
+  const { data, error } = await supabase
+    .from('instagram_insights')
+    .select('value, end_time')
+    .eq('u_id', userId)
+    .eq('metric', metric)
+    .order('end_time', { ascending: true })
+    .limit(limit)
+
+  if (error) {
+    const wrapped = new Error(`Failed to load Instagram account insights: ${error.message}`)
+    wrapped.name = 'SupabaseQueryError'
+    ;(wrapped as { cause?: unknown }).cause = error
+    throw wrapped
+  }
+
+  return (data ?? []).map((row) => {
+    const numericValue =
+      typeof row.value === 'number' ? row.value : Number.parseFloat(String(row.value ?? 0))
+    return {
+      fetchedAt: row.end_time,
+      value: Number.isNaN(numericValue) ? 0 : numericValue,
+    }
+  })
+}
+
+metricsRouter.get('/platform/:platform/account-insights', async (req, res, next) => {
+  try {
+    if (!req.auth) {
+      res.status(500).json({
+        error: 'AuthContextMissing',
+        message: 'Authentication context is not available on the request.',
+      })
+      return
+    }
+
+    const params = z.object({ platform: z.enum(['instagram']) }).parse(req.params)
+    const query = z
+      .object({
+        metric: z
+          .union([z.string(), z.array(z.string())])
+          .optional()
+          .transform((value) => {
+            if (Array.isArray(value)) {
+              return value[0]
+            }
+            return value
+          })
+          .pipe(z.enum(['follower_count', 'reach', 'profile_views', 'accounts_engaged']).optional()),
+        limit: z
+          .union([z.string(), z.number(), z.array(z.string()), z.array(z.number())])
+          .optional()
+          .transform((value) => {
+            if (Array.isArray(value)) {
+              value = value[0]
+            }
+            if (value === undefined) {
+              return undefined
+            }
+            const numeric = typeof value === 'string' ? Number.parseInt(value, 10) : Number(value)
+            return Number.isNaN(numeric) ? undefined : numeric
+          })
+          .pipe(z.number().int().min(1).max(500).optional()),
+      })
+      .parse(req.query)
+
+    const supabase = createSupabaseUserClient(req.auth.token)
+    const limit = query.limit ?? 365
+    const metric = query.metric ?? 'follower_count'
+
+    const insights = await loadInstagramAccountInsights(supabase, req.auth.userId, metric, limit)
+
+    res.json({
+      platform: params.platform,
+      metric,
+      insights,
+    })
   } catch (error) {
     if (error instanceof z.ZodError) {
       res.status(400).json({

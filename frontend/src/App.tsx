@@ -7,6 +7,7 @@ import { OAuthCallbackPage } from './pages/auth/OAuthCallbackPage'
 import { AnalyticsPage } from './pages/analytics/AnalyticsPage'
 import { DashboardPage } from './pages/dashboard/DashboardPage'
 import { ProfilePage } from './pages/profile/ProfilePage'
+import { ProjectsPage } from './pages/projects/ProjectsPage'
 import { SettingsPage } from './pages/settings/SettingsPage'
 import { AppProviders } from './providers/AppProviders'
 
@@ -20,6 +21,7 @@ function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<RootLayout />}>
               <Route index element={<DashboardPage />} />
+              <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/settings" element={<SettingsPage />} />

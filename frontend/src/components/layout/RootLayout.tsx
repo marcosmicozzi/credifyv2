@@ -5,6 +5,7 @@ import { useAuth } from '../../providers/AuthProvider'
 
 const navItems = [
   { label: 'Dashboard', to: '/' },
+  { label: 'Projects', to: '/projects' },
   { label: 'Analytics', to: '/analytics' },
   { label: 'Profile', to: '/profile' },
   { label: 'Settings', to: '/settings' },

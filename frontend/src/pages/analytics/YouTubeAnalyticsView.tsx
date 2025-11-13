@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 
-import { usePlatformMetrics, useMetricsSummary } from '../../hooks/api/metrics'
+import { usePlatformMetrics, useMetricsSummary, useInstagramAccountInsights } from '../../hooks/api/metrics'
 
 const numberFormatter = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 })
 const percentFormatter = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 2 })
@@ -91,8 +91,11 @@ type YouTubeAnalyticsViewProps = {
   errorMessage: string | null
 }
 
+type SelectedMetric = 'views' | 'likes' | 'comments' | 'followers'
+
 export function YouTubeAnalyticsView({ platform, isLoading, hasErrors, errorMessage }: YouTubeAnalyticsViewProps) {
   const [selectedRange, setSelectedRange] = useState<RangeOption>(RANGE_OPTIONS[0])
+  const [selectedMetric, setSelectedMetric] = useState<SelectedMetric>('views')
 
   const {
     data: summary,
@@ -107,6 +110,17 @@ export function YouTubeAnalyticsView({ platform, isLoading, hasErrors, errorMess
   } = usePlatformMetrics({
     platform,
     limit: 365,
+  })
+
+  // Fetch Instagram account insights when followers metric is selected
+  const {
+    data: accountInsights,
+    isLoading: accountInsightsLoading,
+    isError: accountInsightsErrored,
+  } = useInstagramAccountInsights({
+    metric: 'follower_count',
+    limit: 365,
+    enabled: platform === 'instagram' && selectedMetric === 'followers',
   })
 
   const platformMetricsData =
@@ -167,36 +181,119 @@ export function YouTubeAnalyticsView({ platform, isLoading, hasErrors, errorMess
     })
   }, [platformMetricsData, selectedRange])
 
+  // Get chart data based on selected metric
+  const chartData = useMemo(() => {
+    if (platform === 'instagram' && selectedMetric === 'followers') {
+      // Use account insights for followers
+      if (!accountInsights?.insights.length) {
+        return []
+      }
+
+      const rangeDays = selectedRange.days
+      const endDate = new Date(accountInsights.insights[accountInsights.insights.length - 1].fetchedAt)
+
+      return accountInsights.insights
+        .filter((insight) => {
+          const insightDate = new Date(insight.fetchedAt)
+          const diffMs = endDate.getTime() - insightDate.getTime()
+          const diffDays = diffMs / (1000 * 60 * 60 * 24)
+          return diffDays <= rangeDays - 1
+        })
+        .map((insight, index, arr) => {
+          const previous = index > 0 ? arr[index - 1] : null
+          return {
+            fetchedAt: insight.fetchedAt,
+            value: insight.value,
+            dailyValue: previous ? insight.value - previous.value : 0,
+          }
+        })
+    } else {
+      // Use post-level metrics for views, likes, comments
+      if (!filteredDailyMetrics.length) {
+        return []
+      }
+
+      return filteredDailyMetrics.map((metric) => {
+        let value = 0
+        let dailyValue = 0
+
+        switch (selectedMetric) {
+          case 'views':
+            value = metric.lifetimeViews ?? 0
+            dailyValue = metric.dailyViews
+            break
+          case 'likes':
+            value = metric.lifetimeLikes ?? 0
+            dailyValue = metric.dailyLikes
+            break
+          case 'comments':
+            value = metric.lifetimeComments ?? 0
+            dailyValue = metric.dailyComments
+            break
+          default:
+            value = metric.lifetimeViews ?? 0
+            dailyValue = metric.dailyViews
+        }
+
+        return {
+          fetchedAt: metric.fetchedAt,
+          value,
+          dailyValue,
+        }
+      })
+    }
+  }, [platform, selectedMetric, filteredDailyMetrics, accountInsights, selectedRange])
+
   const sparklinePath = useMemo(() => {
-    if (!filteredDailyMetrics.length) {
+    if (!chartData.length) {
       return null
     }
 
-    const values = filteredDailyMetrics.map((metric) => metric.dailyViews).filter((value) => Number.isFinite(value))
+    // For followers, show absolute values. For others, show daily changes
+    const values = chartData.map((point) =>
+      selectedMetric === 'followers' ? point.value : point.dailyValue,
+    ).filter((value) => Number.isFinite(value))
+    
     if (!values.length) {
       return null
     }
 
     return buildSparklinePath(values, defaultSparklineSize)
-  }, [filteredDailyMetrics])
+  }, [chartData, selectedMetric])
 
   const latestSnapshot = filteredSnapshots.length ? filteredSnapshots[filteredSnapshots.length - 1] : null
   const latestDaily = filteredDailyMetrics.length ? filteredDailyMetrics[filteredDailyMetrics.length - 1] : null
   const previousDaily =
     filteredDailyMetrics.length > 1 ? filteredDailyMetrics[filteredDailyMetrics.length - 2] : null
 
-  const dayOverDayDelta =
-    latestDaily && previousDaily
-      ? latestDaily.dailyViews - previousDaily.dailyViews
-      : null
+  const dayOverDayDelta = useMemo(() => {
+    if (selectedMetric === 'followers' && chartData.length >= 2) {
+      const latest = chartData[chartData.length - 1]
+      const previous = chartData[chartData.length - 2]
+      return latest.value - previous.value
+    }
+
+    if (latestDaily && previousDaily) {
+      switch (selectedMetric) {
+        case 'views':
+          return latestDaily.dailyViews - previousDaily.dailyViews
+        case 'likes':
+          return latestDaily.dailyLikes - previousDaily.dailyLikes
+        case 'comments':
+          return latestDaily.dailyComments - previousDaily.dailyComments
+        default:
+          return latestDaily.dailyViews - previousDaily.dailyViews
+      }
+    }
+
+    return null
+  }, [selectedMetric, latestDaily, previousDaily, chartData])
 
   const totalSnapshotRange =
-    filteredDailyMetrics.length &&
-    filteredDailyMetrics[0]?.fetchedAt &&
-    filteredDailyMetrics[filteredDailyMetrics.length - 1]?.fetchedAt
+    chartData.length && chartData[0]?.fetchedAt && chartData[chartData.length - 1]?.fetchedAt
       ? {
-          start: new Date(filteredDailyMetrics[0].fetchedAt),
-          end: new Date(filteredDailyMetrics[filteredDailyMetrics.length - 1].fetchedAt),
+          start: new Date(chartData[0].fetchedAt),
+          end: new Date(chartData[chartData.length - 1].fetchedAt),
         }
       : null
 
@@ -236,8 +333,14 @@ export function YouTubeAnalyticsView({ platform, isLoading, hasErrors, errorMess
   }, [filteredDailyMetrics, latestSnapshot])
 
   const summarySource = useMemo(() => {
+    // Follower count is account-level, not post-level, so always get it from summary
+    const followerCount = summary?.followerCount ?? null
+
     if (rangeSummary) {
-      return rangeSummary
+      return {
+        ...rangeSummary,
+        followerCount,
+      }
     }
 
     if (summary) {
@@ -248,6 +351,7 @@ export function YouTubeAnalyticsView({ platform, isLoading, hasErrors, errorMess
         totalShareCount: summary.totalShareCount ?? 0,
         averageEngagementRate: summary.averageEngagementRate ?? 0,
         updatedAt: summary.updatedAt ?? null,
+        followerCount,
       }
     }
 
@@ -258,19 +362,40 @@ export function YouTubeAnalyticsView({ platform, isLoading, hasErrors, errorMess
     {
       label: 'Views',
       value: summarySource?.totalViewCount ?? 0,
+      metric: 'views' as SelectedMetric,
     },
     {
       label: 'Likes',
       value: summarySource?.totalLikeCount ?? 0,
+      metric: 'likes' as SelectedMetric,
     },
     {
       label: 'Comments',
       value: summarySource?.totalCommentCount ?? 0,
+      metric: 'comments' as SelectedMetric,
     },
+    // Add Followers card only for Instagram
+    ...(platform === 'instagram'
+      ? [
+          {
+            label: 'Followers',
+            value: summarySource?.followerCount ?? 0,
+            metric: 'followers' as SelectedMetric,
+          },
+        ]
+      : []),
   ]
 
-  const viewIsLoading = isLoading || summaryLoading || platformMetricsLoading
-  const viewHasErrors = hasErrors || summaryErrored || platformMetricsErrored
+  const viewIsLoading =
+    isLoading ||
+    summaryLoading ||
+    platformMetricsLoading ||
+    (platform === 'instagram' && selectedMetric === 'followers' && accountInsightsLoading)
+  const viewHasErrors =
+    hasErrors ||
+    summaryErrored ||
+    platformMetricsErrored ||
+    (platform === 'instagram' && selectedMetric === 'followers' && accountInsightsErrored)
 
   return (
     <>
@@ -317,31 +442,51 @@ export function YouTubeAnalyticsView({ platform, isLoading, hasErrors, errorMess
 
       {!viewIsLoading && !viewHasErrors && (
         <>
-          <section className="grid gap-6 lg:grid-cols-3">
-            {summaryCards.map((card) => (
-              <article
-                key={card.label}
-                className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-6 shadow-[0_20px_80px_-40px_rgba(15,23,42,0.8)]"
-              >
-                <header className="text-xs uppercase tracking-[0.28em] text-slate-500">{card.label}</header>
-                <p className="mt-5 text-3xl font-semibold tracking-tight text-white">
-                  {card.formatter
-                    ? card.formatter(card.value)
-                    : numberFormatter.format(card.value ?? 0)}
-                </p>
-              </article>
-            ))}
+          <section className={`grid gap-6 ${platform === 'instagram' ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
+            {summaryCards.map((card) => {
+              const isSelected = selectedMetric === card.metric
+              return (
+                <button
+                  key={card.label}
+                  type="button"
+                  onClick={() => setSelectedMetric(card.metric)}
+                  className={`rounded-2xl border p-6 text-left shadow-[0_20px_80px_-40px_rgba(15,23,42,0.8)] transition ${
+                    isSelected
+                      ? 'border-emerald-500/70 bg-emerald-500/10'
+                      : 'border-slate-800/80 bg-slate-900/40 hover:border-slate-700/80'
+                  }`}
+                >
+                  <header className="text-xs uppercase tracking-[0.28em] text-slate-500">{card.label}</header>
+                  <p className="mt-5 text-3xl font-semibold tracking-tight text-white">
+                    {card.formatter
+                      ? card.formatter(card.value)
+                      : numberFormatter.format(card.value ?? 0)}
+                  </p>
+                </button>
+              )
+            })}
           </section>
 
           <section className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-8">
             <header className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
               <div>
                 <h2 className="text-lg font-semibold tracking-tight text-white">
-                  {platform === 'youtube' ? 'YouTube' : 'Instagram'} View Trend
+                  {platform === 'youtube' ? 'YouTube' : 'Instagram'}{' '}
+                  {selectedMetric === 'views'
+                    ? 'View'
+                    : selectedMetric === 'likes'
+                      ? 'Like'
+                      : selectedMetric === 'comments'
+                        ? 'Comment'
+                        : 'Follower'}{' '}
+                  Trend
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Showing the last {selectedRange.label} window · {filteredDailyMetrics.length} daily snapshots
-                  aggregated across all {platform === 'youtube' ? 'YouTube' : 'Instagram'} projects.
+                  Showing the last {selectedRange.label} window · {chartData.length} daily snapshots
+                  {selectedMetric === 'followers'
+                    ? ' for account-level metrics'
+                    : ` aggregated across all ${platform === 'youtube' ? 'YouTube' : 'Instagram'} projects`}
+                  .
                 </p>
               </div>
               {dayOverDayDelta !== null && (
@@ -364,7 +509,7 @@ export function YouTubeAnalyticsView({ platform, isLoading, hasErrors, errorMess
                   viewBox={`0 0 ${defaultSparklineSize.width} ${defaultSparklineSize.height}`}
                   className="h-64 w-full"
                   role="img"
-                  aria-label={`Daily ${platform === 'youtube' ? 'YouTube' : 'Instagram'} view counts`}
+                  aria-label={`Daily ${platform === 'youtube' ? 'YouTube' : 'Instagram'} ${selectedMetric} trend`}
                 >
                   <defs>
                     <linearGradient id="sparklineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -393,8 +538,9 @@ export function YouTubeAnalyticsView({ platform, isLoading, hasErrors, errorMess
               </div>
             ) : (
               <p className="mt-6 text-sm text-slate-400">
-                No {platform === 'youtube' ? 'YouTube' : 'Instagram'} metrics available yet. Metrics populate
-                automatically once data arrives from Supabase.
+                No {platform === 'youtube' ? 'YouTube' : 'Instagram'}{' '}
+                {selectedMetric === 'followers' ? 'follower' : selectedMetric} metrics available yet. Metrics
+                populate automatically once data arrives from Supabase.
               </p>
             )}
           </section>
