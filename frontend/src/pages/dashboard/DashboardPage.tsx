@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 
-import { useMetricsSummary } from '../../hooks/api/metrics'
+import { useMetricsSummary, useRefreshMetrics } from '../../hooks/api/metrics'
 import { useProjects } from '../../hooks/api/projects'
 import { useAuth } from '../../providers/AuthProvider'
 
@@ -53,6 +53,7 @@ export function DashboardPage() {
     isError: metricsErrored,
     error: metricsError,
   } = useMetricsSummary()
+  const refreshMetrics = useRefreshMetrics()
 
   const totalProjects = useMemo(() => projects?.length ?? 0, [projects])
 
@@ -81,6 +82,7 @@ export function DashboardPage() {
   }, [projects])
 
   const cardFallback = '—'
+  const refreshErrorMessage = refreshMetrics.isError ? getErrorMessage(refreshMetrics.error) : null
   const formatViewGrowth = (value: number | null | undefined) => {
     if (value === null || value === undefined) {
       return cardFallback
@@ -200,37 +202,69 @@ export function DashboardPage() {
         <article className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-8">
           <header className="flex items-center justify-between">
             <h2 className="text-lg font-semibold tracking-tight text-white">Performance Overview</h2>
-            <span className="text-xs uppercase tracking-[0.28em] text-slate-500">
-              {metricsLoading ? 'Loading…' : metricsErrored ? 'Error' : 'Updated'}
-            </span>
           </header>
           {metricsErrored && metricsStateMessage && (
             <p className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-200">
               {metricsStateMessage}
             </p>
           )}
-          {!metricsErrored && (
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <div className="rounded-xl border border-slate-800/70 bg-slate-950/50 p-5">
-                <h3 className="text-sm font-medium text-white">Latest Metrics Sync</h3>
-                <p className="mt-3 text-xs text-slate-500">
-                  {summary?.updatedAt ? new Date(summary.updatedAt).toLocaleString() : cardFallback}
-                </p>
-              </div>
-              <div className="rounded-xl border border-slate-800/70 bg-slate-950/50 p-5">
-                <h3 className="text-sm font-medium text-white">24H Growth (%)</h3>
-                <p className="mt-3 text-xs text-slate-500">
-                  {metricsLoading
-                    ? 'Loading…'
-                    : metricsErrored
-                      ? 'Error'
-                      : summary
-                        ? formatViewGrowth(summary.viewGrowth24hPercent)
-                        : cardFallback}
-                </p>
-              </div>
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="rounded-xl border border-slate-800/70 bg-slate-950/50 p-5">
+              <h3 className="text-sm font-medium text-white">Latest Metrics Sync</h3>
+              <p className="mt-3 text-xs text-slate-500">
+                {metricsLoading
+                  ? 'Loading…'
+                  : metricsErrored
+                    ? 'Error'
+                    : summary?.updatedAt
+                      ? new Date(summary.updatedAt).toLocaleString()
+                      : cardFallback}
+              </p>
             </div>
-          )}
+            <div className="rounded-xl border border-slate-800/70 bg-slate-950/50 p-5">
+              <h3 className="text-sm font-medium text-white">24H Growth (%)</h3>
+              <p className="mt-3 text-xs text-slate-500">
+                {metricsLoading
+                  ? 'Loading…'
+                  : metricsErrored
+                    ? 'Error'
+                    : summary
+                      ? formatViewGrowth(summary.viewGrowth24hPercent)
+                      : cardFallback}
+              </p>
+            </div>
+            <div className="flex flex-col rounded-xl border border-slate-800/70 bg-slate-950/50 p-5">
+              <h3 className="text-sm font-medium text-white">Refresh Sync</h3>
+              <p className="mt-3 text-xs text-slate-500">
+                Pull the latest YouTube metrics across your claimed projects on demand.
+              </p>
+              <button
+                type="button"
+                onClick={() => refreshMetrics.mutate()}
+                disabled={refreshMetrics.isPending || metricsLoading}
+                className="mt-4 inline-flex items-center justify-center rounded-lg bg-emerald-500/20 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {refreshMetrics.isPending ? 'Refreshing…' : 'Refresh Sync'}
+              </button>
+              {refreshMetrics.isSuccess && refreshMetrics.data?.sync?.syncedVideoCount !== undefined && (
+                <p className="mt-3 text-xs text-slate-500">
+                  Synced {refreshMetrics.data.sync.syncedVideoCount}{' '}
+                  {refreshMetrics.data.sync.syncedVideoCount === 1 ? 'video' : 'videos'}
+                  {refreshMetrics.data.sync.snapshotDate
+                    ? ` · ${new Date(refreshMetrics.data.sync.snapshotDate).toLocaleString()}`
+                    : ''}
+                </p>
+              )}
+              {refreshMetrics.isSuccess && refreshMetrics.data?.sync?.details && (
+                <p className="mt-1 text-xs text-slate-500">{refreshMetrics.data.sync.details}</p>
+              )}
+              {refreshErrorMessage && (
+                <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
+                  {refreshErrorMessage}
+                </p>
+              )}
+            </div>
+          </div>
         </article>
 
         <aside className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-8">

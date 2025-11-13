@@ -23,9 +23,13 @@ export function AnalyticsPage() {
     [projects],
   )
 
-  const primaryProject = youtubeProjects[0] ?? null
+  const instagramProjects = useMemo(
+    () => projects?.filter((p) => p.platform === 'instagram') ?? [],
+    [projects],
+  )
 
   const hasYouTubeProjects = youtubeProjects.length > 0
+  const hasInstagramProjects = instagramProjects.length > 0
 
   const isLoading = projectsLoading
   const hasErrors = projectsErrored
@@ -44,8 +48,8 @@ export function AnalyticsPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-white">Analytics</h1>
           <p className="mt-2 text-sm text-slate-400">
             {selectedPlatform === 'youtube'
-              ? `Daily YouTube performance${primaryProject ? ` for ${primaryProject.title ?? primaryProject.link}` : ''}.`
-              : 'Instagram analytics coming soon — connect your account in Settings.'}
+              ? 'Cumulative analytics across all your YouTube projects.'
+              : 'Cumulative analytics across all your Instagram content.'}
           </p>
         </div>
 
@@ -128,7 +132,7 @@ export function AnalyticsPage() {
 
           {hasYouTubeProjects && (
             <YouTubeAnalyticsView
-              primaryProject={primaryProject}
+              platform="youtube"
               isLoading={isLoading}
               hasErrors={hasErrors}
               errorMessage={errorMessage}
@@ -138,31 +142,44 @@ export function AnalyticsPage() {
       )}
 
       {selectedPlatform === 'instagram' && (
-        <article className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-8">
-          <div className="flex flex-col items-center gap-6 text-center">
-            <div className="rounded-full border border-slate-700/60 bg-slate-800/50 p-4">
-              <svg
-                className="h-8 w-8 text-slate-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                  <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
-                </svg>
+        <>
+          {!hasInstagramProjects && !isLoading && (
+            <article className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-8">
+              <div className="flex flex-col items-center gap-6 text-center">
+                <div className="rounded-full border border-slate-700/60 bg-slate-800/50 p-4">
+                  <svg
+                    className="h-8 w-8 text-slate-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
                 </div>
-            <div className="space-y-2">
-              <h2 className="text-xl font-semibold text-white">Instagram Analytics Coming Soon</h2>
-              <p className="text-sm text-slate-400">
-                Connect your Instagram account in Settings to enable analytics when available.
-              </p>
+                <div className="space-y-2">
+                  <h2 className="text-xl font-semibold text-white">No Instagram Projects Yet</h2>
+                  <p className="text-sm text-slate-400">
+                    Connect your Instagram account in Settings to enable analytics when available.
+                  </p>
                 </div>
-                </div>
-        </article>
+              </div>
+            </article>
+          )}
+
+          {hasInstagramProjects && (
+            <YouTubeAnalyticsView
+              platform="instagram"
+              isLoading={isLoading}
+              hasErrors={hasErrors}
+              errorMessage={errorMessage}
+            />
+          )}
+        </>
       )}
 
       <ClaimYouTubeModal

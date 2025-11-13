@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 import { authenticate } from '../middleware/authenticate.js'
 import { createSupabaseUserClient } from '../services/supabaseUserClient.js'
+import { syncYouTubeMetricsForUser } from '../services/youtubeIntegration.js'
 
 const userMetricsRowSchema = z.object({
   total_view_count: z.number().nullable(),
@@ -94,6 +95,7 @@ async function getUserProjectIds(supabase: ReturnType<typeof createSupabaseUserC
 async function computeAggregatedSummary(
   supabase: ReturnType<typeof createSupabaseUserClient>,
   projectIds: string[],
+  platform?: 'youtube' | 'instagram',
 ): Promise<AggregatedSummary | null> {
   if (!projectIds.length) {
     return null
@@ -117,97 +119,93 @@ async function computeAggregatedSummary(
     }
   }
 
-  if (projectIds.length > 0) {
-    const { data: youtubeRows, error: youtubeError } = await supabase
-      .from('youtube_metrics')
-      .select(
-        `
-        fetched_at,
+  // Only load YouTube metrics if platform is not specified or is YouTube
+  if (!platform || platform === 'youtube') {
+    if (projectIds.length > 0) {
+      // Use the latest_metrics view to get the most recent snapshot per project
+      const { data: latestYoutubeRows, error: youtubeError } = await supabase
+        .from('youtube_latest_metrics')
+        .select(
+          `
+        p_id,
         view_count,
         like_count,
         comment_count,
         share_count,
-        engagement_rate
+        engagement_rate,
+        fetched_at
       `,
-      )
-      .in('p_id', projectIds)
-      .order('fetched_at', { ascending: true })
-      .limit(2000)
+        )
+        .in('p_id', projectIds)
 
-    if (youtubeError) {
-      const wrapped = new Error(`Failed to load YouTube metrics: ${youtubeError.message}`)
-      wrapped.name = 'SupabaseQueryError'
-      ;(wrapped as { cause?: unknown }).cause = youtubeError
-      throw wrapped
-    }
-
-    const parsedYoutube = z.array(youtubeMetricRowSchema).safeParse(youtubeRows)
-    if (!parsedYoutube.success) {
-      const error = new Error('Invalid YouTube metrics data received from Supabase.')
-      error.name = 'SupabaseDataValidationError'
-      ;(error as { details?: unknown }).details = parsedYoutube.error.flatten()
-      throw error
-    }
-
-    for (const row of parsedYoutube.data) {
-      totalViewCount += row.view_count ?? 0
-      totalLikeCount += row.like_count ?? 0
-      totalCommentCount += row.comment_count ?? 0
-      totalShareCount += row.share_count ?? 0
-
-      if (row.engagement_rate !== null && row.engagement_rate !== undefined) {
-        engagementRateSum += Number(row.engagement_rate)
-        engagementRateCount += 1
+      if (youtubeError) {
+        const wrapped = new Error(`Failed to load YouTube latest metrics: ${youtubeError.message}`)
+        wrapped.name = 'SupabaseQueryError'
+        ;(wrapped as { cause?: unknown }).cause = youtubeError
+        throw wrapped
       }
 
-      updateSummaryFromTimestamp(row.fetched_at)
+      if (latestYoutubeRows && latestYoutubeRows.length > 0) {
+        // Sum the latest metrics across all projects
+        for (const row of latestYoutubeRows) {
+          totalViewCount += (row.view_count as number) ?? 0
+          totalLikeCount += (row.like_count as number) ?? 0
+          totalCommentCount += (row.comment_count as number) ?? 0
+          totalShareCount += (row.share_count as number) ?? 0
+
+          if (row.engagement_rate !== null && row.engagement_rate !== undefined) {
+            engagementRateSum += Number(row.engagement_rate)
+            engagementRateCount += 1
+          }
+
+          updateSummaryFromTimestamp(row.fetched_at as string)
+        }
+      }
     }
   }
 
-  if (projectIds.length > 0) {
-    const { data: instagramRows, error: instagramError } = await supabase
-      .from('instagram_metrics')
-      .select(
-        `
-        fetched_at,
+  // Only load Instagram metrics if platform is not specified or is Instagram
+  if (!platform || platform === 'instagram') {
+    if (projectIds.length > 0) {
+      // Use the latest_metrics view to get the most recent snapshot per project
+      const { data: latestInstagramRows, error: instagramError } = await supabase
+        .from('instagram_latest_metrics')
+        .select(
+          `
+        p_id,
         view_count,
         like_count,
         comment_count,
         reach,
         save_count,
-        engagement_rate
+        engagement_rate,
+        fetched_at
       `,
-      )
-      .in('p_id', projectIds)
-      .order('fetched_at', { ascending: true })
-      .limit(2000)
+        )
+        .in('p_id', projectIds)
 
-    if (instagramError) {
-      const wrapped = new Error(`Failed to load Instagram metrics: ${instagramError.message}`)
-      wrapped.name = 'SupabaseQueryError'
-      ;(wrapped as { cause?: unknown }).cause = instagramError
-      throw wrapped
-    }
-
-    const parsedInstagram = z.array(instagramMetricRowSchema).safeParse(instagramRows)
-    if (!parsedInstagram.success) {
-      const error = new Error('Invalid Instagram metrics data received from Supabase.')
-      error.name = 'SupabaseDataValidationError'
-      ;(error as { details?: unknown }).details = parsedInstagram.error.flatten()
-      throw error
-    }
-
-    for (const row of parsedInstagram.data) {
-      totalViewCount += row.view_count ?? 0
-      totalLikeCount += row.like_count ?? 0
-      totalCommentCount += row.comment_count ?? 0
-
-      if (row.engagement_rate !== null && row.engagement_rate !== undefined) {
-        engagementRateSum += Number(row.engagement_rate)
-        engagementRateCount += 1
+      if (instagramError) {
+        const wrapped = new Error(`Failed to load Instagram latest metrics: ${instagramError.message}`)
+        wrapped.name = 'SupabaseQueryError'
+        ;(wrapped as { cause?: unknown }).cause = instagramError
+        throw wrapped
       }
 
-      updateSummaryFromTimestamp(row.fetched_at)
+      if (latestInstagramRows && latestInstagramRows.length > 0) {
+        // Sum the latest metrics across all projects
+        for (const row of latestInstagramRows) {
+          totalViewCount += (row.view_count as number) ?? 0
+          totalLikeCount += (row.like_count as number) ?? 0
+          totalCommentCount += (row.comment_count as number) ?? 0
+
+          if (row.engagement_rate !== null && row.engagement_rate !== undefined) {
+            engagementRateSum += Number(row.engagement_rate)
+            engagementRateCount += 1
+          }
+
+          updateSummaryFromTimestamp(row.fetched_at as string)
+        }
+      }
     }
   }
 
@@ -331,9 +329,110 @@ async function computeViewGrowth24hPercent(
   return percent
 }
 
+async function loadMetricsSummary(
+  supabase: ReturnType<typeof createSupabaseUserClient>,
+  userId: string,
+  platform?: 'youtube' | 'instagram',
+) {
+  let projectIds = await getUserProjectIds(supabase, userId)
+
+  // Filter by platform if specified
+  if (platform) {
+    const { data: platformProjects, error: projectsError } = await supabase
+      .from('projects')
+      .select('p_id')
+      .in('p_id', projectIds)
+      .eq('p_platform', platform)
+
+    if (projectsError) {
+      const wrapped = new Error(`Failed to load platform projects: ${projectsError.message}`)
+      wrapped.name = 'SupabaseQueryError'
+      ;(wrapped as { cause?: unknown }).cause = projectsError
+      throw wrapped
+    }
+
+    projectIds = platformProjects?.map((p) => p.p_id) ?? []
+  }
+
+  const { data, error } = await supabase
+    .from('user_metrics')
+    .select(
+      `
+        total_view_count,
+        total_like_count,
+        total_comment_count,
+        total_share_count,
+        avg_engagement_rate,
+        updated_at
+      `,
+    )
+    .eq('u_id', userId)
+    .maybeSingle()
+
+  if (error && error.code !== 'PGRST116') {
+    const wrapped = new Error(`Failed to load metrics summary: ${error.message}`)
+    wrapped.name = 'SupabaseQueryError'
+    ;(wrapped as { cause?: unknown }).cause = error
+    throw wrapped
+  }
+
+  const parsed = data ? userMetricsRowSchema.parse(data) : null
+
+  let summary: AggregatedSummary | null = parsed
+    ? {
+        totalViewCount: parsed.total_view_count ?? 0,
+        totalLikeCount: parsed.total_like_count ?? 0,
+        totalCommentCount: parsed.total_comment_count ?? 0,
+        totalShareCount: parsed.total_share_count ?? 0,
+        averageEngagementRate: parsed.avg_engagement_rate ?? 0,
+        updatedAt: parsed.updated_at ?? null,
+        viewGrowth24hPercent: null,
+      }
+    : null
+
+  // If platform is specified, we need to compute from scratch since user_metrics is not platform-specific
+  if (platform || isZeroSummary(summary)) {
+    const aggregated = await computeAggregatedSummary(supabase, projectIds, platform)
+    if (aggregated) {
+      summary = aggregated
+    }
+  }
+
+  const baseSummary: AggregatedSummary =
+    summary ?? {
+      totalViewCount: 0,
+      totalLikeCount: 0,
+      totalCommentCount: 0,
+      totalShareCount: 0,
+      averageEngagementRate: 0,
+      updatedAt: null,
+      viewGrowth24hPercent: null,
+    }
+
+  const viewGrowth24hPercent = await computeViewGrowth24hPercent(supabase, projectIds)
+
+  return {
+    ...baseSummary,
+    viewGrowth24hPercent,
+  }
+}
+
 const metricsRouter = Router()
 
 metricsRouter.use(authenticate)
+
+const summaryQuerySchema = z.object({
+  platform: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((value) => {
+      if (Array.isArray(value)) {
+        return value[0]
+      }
+      return value
+    })
+    .pipe(z.enum(['youtube', 'instagram']).optional()),
+})
 
 metricsRouter.get('/summary', async (req, res, next) => {
   try {
@@ -345,72 +444,54 @@ metricsRouter.get('/summary', async (req, res, next) => {
       return
     }
 
+    const query = summaryQuerySchema.parse(req.query)
     const supabase = createSupabaseUserClient(req.auth.token)
 
-    const projectIds = await getUserProjectIds(supabase, req.auth.userId)
-
-    const { data, error } = await supabase
-      .from('user_metrics')
-      .select(
-        `
-        total_view_count,
-        total_like_count,
-        total_comment_count,
-        total_share_count,
-        avg_engagement_rate,
-        updated_at
-      `,
-      )
-      .eq('u_id', req.auth.userId)
-      .maybeSingle()
-
-    if (error && error.code !== 'PGRST116') {
-      const wrapped = new Error(`Failed to load metrics summary: ${error.message}`)
-      wrapped.name = 'SupabaseQueryError'
-      ;(wrapped as { cause?: unknown }).cause = error
-      throw wrapped
-    }
-
-    const parsed = data ? userMetricsRowSchema.parse(data) : null
-
-    let summary: AggregatedSummary | null = parsed
-      ? {
-          totalViewCount: parsed.total_view_count ?? 0,
-          totalLikeCount: parsed.total_like_count ?? 0,
-          totalCommentCount: parsed.total_comment_count ?? 0,
-          totalShareCount: parsed.total_share_count ?? 0,
-          averageEngagementRate: parsed.avg_engagement_rate ?? 0,
-          updatedAt: parsed.updated_at ?? null,
-          viewGrowth24hPercent: null,
-        }
-      : null
-
-    if (isZeroSummary(summary)) {
-      const aggregated = await computeAggregatedSummary(supabase, projectIds)
-      if (aggregated) {
-        summary = aggregated
-      }
-    }
-
-    const viewGrowth24hPercent = await computeViewGrowth24hPercent(supabase, projectIds)
-
-    const responseSummary: AggregatedSummary = summary
-      ? {
-          ...summary,
-          viewGrowth24hPercent,
-        }
-      : {
-          totalViewCount: 0,
-          totalLikeCount: 0,
-          totalCommentCount: 0,
-          totalShareCount: 0,
-          averageEngagementRate: 0,
-          updatedAt: null,
-          viewGrowth24hPercent,
-        }
+    const summary = await loadMetricsSummary(supabase, req.auth.userId, query.platform)
 
     res.json({
-      summary: responseSummary,
+      summary,
+    })
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        error: 'ValidationError',
+        message: 'Invalid request parameters.',
+        details: error.flatten(),
+      })
+      return
+    }
+
+    next(error)
+  }
+})
+
+metricsRouter.post('/summary/refresh', async (req, res, next) => {
+  try {
+    if (!req.auth) {
+      res.status(500).json({
+        error: 'AuthContextMissing',
+        message: 'Authentication context is not available on the request.',
+      })
+      return
+    }
+
+    if (req.auth.isDemo) {
+      res.status(403).json({
+        error: 'DemoModeRestricted',
+        message: 'Refreshing metrics is not available in demo mode.',
+      })
+      return
+    }
+
+    const supabase = createSupabaseUserClient(req.auth.token)
+
+    const syncResult = await syncYouTubeMetricsForUser(req.auth.userId)
+    const summary = await loadMetricsSummary(supabase, req.auth.userId)
+
+    res.json({
+      summary,
+      sync: syncResult,
     })
   } catch (error) {
     next(error)
@@ -609,6 +690,320 @@ metricsRouter.get('/projects/:projectId', async (req, res, next) => {
       },
       metrics: response,
     })
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        error: 'ValidationError',
+        message: 'Invalid request parameters.',
+        details: error.flatten(),
+      })
+      return
+    }
+
+    next(error)
+  }
+})
+
+const platformMetricsParamsSchema = z.object({
+  platform: z.enum(['youtube', 'instagram']),
+})
+
+const platformMetricsQuerySchema = z.object({
+  limit: z
+    .union([z.string(), z.number(), z.array(z.string()), z.array(z.number())])
+    .optional()
+    .transform((value) => {
+      if (Array.isArray(value)) {
+        value = value[0]
+      }
+
+      if (value === undefined) {
+        return undefined
+      }
+
+      const numeric = typeof value === 'string' ? Number.parseInt(value, 10) : Number(value)
+      return Number.isNaN(numeric) ? undefined : numeric
+    })
+    .pipe(z.number().int().min(1).max(500).optional()),
+})
+
+async function loadPlatformMetrics(
+  supabase: ReturnType<typeof createSupabaseUserClient>,
+  userId: string,
+  platform: 'youtube' | 'instagram',
+  limit: number,
+) {
+  // Get all user project IDs first
+  const allProjectIds = await getUserProjectIds(supabase, userId)
+
+  if (!allProjectIds.length) {
+    return {
+      platform,
+      filters: {
+        platform,
+        limit,
+      },
+      metrics: {
+        youtube: [],
+        instagram: [],
+      },
+    }
+  }
+
+  // Get projects filtered by platform
+  const { data: platformProjects, error: projectsError } = await supabase
+    .from('projects')
+    .select('p_id')
+    .in('p_id', allProjectIds)
+    .eq('p_platform', platform)
+
+  if (projectsError) {
+    const wrapped = new Error(`Failed to load platform projects: ${projectsError.message}`)
+    wrapped.name = 'SupabaseQueryError'
+    ;(wrapped as { cause?: unknown }).cause = projectsError
+    throw wrapped
+  }
+
+  const platformProjectIds = platformProjects?.map((p) => p.p_id) ?? []
+
+  if (!platformProjectIds.length) {
+    return {
+      platform,
+      filters: {
+        platform,
+        limit,
+      },
+      metrics: {
+        youtube: [],
+        instagram: [],
+      },
+    }
+  }
+
+  const response: {
+    youtube: Array<{
+      fetchedAt: string
+      viewCount: number | null
+      likeCount: number | null
+      commentCount: number | null
+      shareCount: number | null
+      engagementRate: number | null
+    }>
+    instagram: Array<{
+      fetchedAt: string
+      viewCount: number | null
+      likeCount: number | null
+      commentCount: number | null
+      reach: number | null
+      saveCount: number | null
+      engagementRate: number | null
+    }>
+  } = {
+    youtube: [],
+    instagram: [],
+  }
+
+  if (platform === 'youtube') {
+    const { data, error } = await supabase
+      .from('youtube_metrics')
+      .select(
+        `
+        fetched_at,
+        view_count,
+        like_count,
+        comment_count,
+        share_count,
+        engagement_rate
+      `,
+      )
+      .in('p_id', platformProjectIds)
+      .order('fetched_at', { ascending: true })
+      .limit(limit * platformProjectIds.length)
+
+    if (error) {
+      const wrapped = new Error(`Failed to load YouTube metrics: ${error.message}`)
+      wrapped.name = 'SupabaseQueryError'
+      ;(wrapped as { cause?: unknown }).cause = error
+      throw wrapped
+    }
+
+    const parsed = z.array(youtubeMetricRowSchema).safeParse(data)
+
+    if (!parsed.success) {
+      const error = new Error('Invalid YouTube metrics data received from Supabase.')
+      error.name = 'SupabaseDataValidationError'
+      ;(error as { details?: unknown }).details = parsed.error.flatten()
+      throw error
+    }
+
+    // Aggregate metrics by fetched_at timestamp across all projects
+    const aggregatedByTimestamp = new Map<
+      string,
+      {
+        viewCount: number
+        likeCount: number
+        commentCount: number
+        shareCount: number
+        engagementRates: number[]
+      }
+    >()
+
+    for (const row of parsed.data) {
+      const timestamp = row.fetched_at
+      const existing = aggregatedByTimestamp.get(timestamp) ?? {
+        viewCount: 0,
+        likeCount: 0,
+        commentCount: 0,
+        shareCount: 0,
+        engagementRates: [],
+      }
+
+      existing.viewCount += row.view_count ?? 0
+      existing.likeCount += row.like_count ?? 0
+      existing.commentCount += row.comment_count ?? 0
+      existing.shareCount += row.share_count ?? 0
+
+      if (row.engagement_rate !== null && row.engagement_rate !== undefined) {
+        existing.engagementRates.push(Number(row.engagement_rate))
+      }
+
+      aggregatedByTimestamp.set(timestamp, existing)
+    }
+
+    response.youtube = Array.from(aggregatedByTimestamp.entries())
+      .map(([fetchedAt, aggregated]) => ({
+        fetchedAt,
+        viewCount: aggregated.viewCount,
+        likeCount: aggregated.likeCount,
+        commentCount: aggregated.commentCount,
+        shareCount: aggregated.shareCount,
+        engagementRate:
+          aggregated.engagementRates.length > 0
+            ? aggregated.engagementRates.reduce((sum, rate) => sum + rate, 0) / aggregated.engagementRates.length
+            : null,
+      }))
+      .sort((a, b) => new Date(a.fetchedAt).getTime() - new Date(b.fetchedAt).getTime())
+      .slice(-limit)
+  }
+
+  if (platform === 'instagram') {
+    const { data, error } = await supabase
+      .from('instagram_metrics')
+      .select(
+        `
+        fetched_at,
+        view_count,
+        like_count,
+        comment_count,
+        reach,
+        save_count,
+        engagement_rate
+      `,
+      )
+      .in('p_id', platformProjectIds)
+      .order('fetched_at', { ascending: true })
+      .limit(limit * platformProjectIds.length)
+
+    if (error) {
+      const wrapped = new Error(`Failed to load Instagram metrics: ${error.message}`)
+      wrapped.name = 'SupabaseQueryError'
+      ;(wrapped as { cause?: unknown }).cause = error
+      throw wrapped
+    }
+
+    const parsed = z.array(instagramMetricRowSchema).safeParse(data)
+
+    if (!parsed.success) {
+      const error = new Error('Invalid Instagram metrics data received from Supabase.')
+      error.name = 'SupabaseDataValidationError'
+      ;(error as { details?: unknown }).details = parsed.error.flatten()
+      throw error
+    }
+
+    // Aggregate metrics by fetched_at timestamp across all projects
+    const aggregatedByTimestamp = new Map<
+      string,
+      {
+        viewCount: number
+        likeCount: number
+        commentCount: number
+        reach: number
+        saveCount: number
+        engagementRates: number[]
+      }
+    >()
+
+    for (const row of parsed.data) {
+      const timestamp = row.fetched_at
+      const existing = aggregatedByTimestamp.get(timestamp) ?? {
+        viewCount: 0,
+        likeCount: 0,
+        commentCount: 0,
+        reach: 0,
+        saveCount: 0,
+        engagementRates: [],
+      }
+
+      existing.viewCount += row.view_count ?? 0
+      existing.likeCount += row.like_count ?? 0
+      existing.commentCount += row.comment_count ?? 0
+      existing.reach += row.reach ?? 0
+      existing.saveCount += row.save_count ?? 0
+
+      if (row.engagement_rate !== null && row.engagement_rate !== undefined) {
+        existing.engagementRates.push(Number(row.engagement_rate))
+      }
+
+      aggregatedByTimestamp.set(timestamp, existing)
+    }
+
+    response.instagram = Array.from(aggregatedByTimestamp.entries())
+      .map(([fetchedAt, aggregated]) => ({
+        fetchedAt,
+        viewCount: aggregated.viewCount,
+        likeCount: aggregated.likeCount,
+        commentCount: aggregated.commentCount,
+        reach: aggregated.reach,
+        saveCount: aggregated.saveCount,
+        engagementRate:
+          aggregated.engagementRates.length > 0
+            ? aggregated.engagementRates.reduce((sum, rate) => sum + rate, 0) / aggregated.engagementRates.length
+            : null,
+      }))
+      .sort((a, b) => new Date(a.fetchedAt).getTime() - new Date(b.fetchedAt).getTime())
+      .slice(-limit)
+  }
+
+  return {
+    platform,
+    filters: {
+      platform,
+      limit,
+    },
+    metrics: response,
+  }
+}
+
+metricsRouter.get('/platform/:platform', async (req, res, next) => {
+  try {
+    if (!req.auth) {
+      res.status(500).json({
+        error: 'AuthContextMissing',
+        message: 'Authentication context is not available on the request.',
+      })
+      return
+    }
+
+    const params = platformMetricsParamsSchema.parse(req.params)
+    const query = platformMetricsQuerySchema.parse(req.query)
+
+    const supabase = createSupabaseUserClient(req.auth.token)
+
+    const limit = query.limit ?? 365
+
+    const result = await loadPlatformMetrics(supabase, req.auth.userId, params.platform, limit)
+
+    res.json(result)
   } catch (error) {
     if (error instanceof z.ZodError) {
       res.status(400).json({

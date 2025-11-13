@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 
-import { useProjectMetrics, useMetricsSummary } from '../../hooks/api/metrics'
-import type { Project } from '../../hooks/api/projects'
+import { usePlatformMetrics, useMetricsSummary } from '../../hooks/api/metrics'
 
 const numberFormatter = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 })
 const percentFormatter = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 2 })
@@ -86,40 +85,40 @@ const formatPercentValue = (value: number | null | undefined) => {
 }
 
 type YouTubeAnalyticsViewProps = {
-  primaryProject: Project | null
+  platform: 'youtube' | 'instagram'
   isLoading: boolean
   hasErrors: boolean
   errorMessage: string | null
 }
 
-export function YouTubeAnalyticsView({ primaryProject, isLoading, hasErrors, errorMessage }: YouTubeAnalyticsViewProps) {
+export function YouTubeAnalyticsView({ platform, isLoading, hasErrors, errorMessage }: YouTubeAnalyticsViewProps) {
   const [selectedRange, setSelectedRange] = useState<RangeOption>(RANGE_OPTIONS[0])
 
   const {
     data: summary,
     isLoading: summaryLoading,
     isError: summaryErrored,
-  } = useMetricsSummary()
+  } = useMetricsSummary(platform)
 
   const {
-    data: projectMetrics,
-    isLoading: projectMetricsLoading,
-    isError: projectMetricsErrored,
-  } = useProjectMetrics({
-    projectId: primaryProject?.id,
-    platform: 'youtube',
+    data: platformMetrics,
+    isLoading: platformMetricsLoading,
+    isError: platformMetricsErrored,
+  } = usePlatformMetrics({
+    platform,
     limit: 365,
   })
 
-  const youtubeMetrics = projectMetrics?.metrics.youtube ?? []
+  const platformMetricsData =
+    platform === 'youtube' ? platformMetrics?.metrics.youtube ?? [] : platformMetrics?.metrics.instagram ?? []
 
   const dailyMetrics = useMemo(() => {
-    if (!youtubeMetrics.length) {
+    if (!platformMetricsData.length) {
       return []
     }
 
-    return youtubeMetrics.map((metric, index) => {
-      const previous = index > 0 ? youtubeMetrics[index - 1] : null
+    return platformMetricsData.map((metric, index) => {
+      const previous = index > 0 ? platformMetricsData[index - 1] : null
 
       return {
         fetchedAt: metric.fetchedAt,
@@ -134,7 +133,7 @@ export function YouTubeAnalyticsView({ primaryProject, isLoading, hasErrors, err
         lifetimeShares: metric.shareCount ?? null,
       }
     })
-  }, [youtubeMetrics])
+  }, [platformMetricsData])
 
   const filteredDailyMetrics = useMemo(() => {
     if (!dailyMetrics.length) {
@@ -153,20 +152,20 @@ export function YouTubeAnalyticsView({ primaryProject, isLoading, hasErrors, err
   }, [dailyMetrics, selectedRange])
 
   const filteredSnapshots = useMemo(() => {
-    if (!youtubeMetrics.length) {
+    if (!platformMetricsData.length) {
       return []
     }
 
     const rangeDays = selectedRange.days
-    const endDate = new Date(youtubeMetrics[youtubeMetrics.length - 1].fetchedAt)
+    const endDate = new Date(platformMetricsData[platformMetricsData.length - 1].fetchedAt)
 
-    return youtubeMetrics.filter((metric) => {
+    return platformMetricsData.filter((metric) => {
       const metricDate = new Date(metric.fetchedAt)
       const diffMs = endDate.getTime() - metricDate.getTime()
       const diffDays = diffMs / (1000 * 60 * 60 * 24)
       return diffDays <= rangeDays - 1
     })
-  }, [youtubeMetrics, selectedRange])
+  }, [platformMetricsData, selectedRange])
 
   const sparklinePath = useMemo(() => {
     if (!filteredDailyMetrics.length) {
@@ -270,8 +269,8 @@ export function YouTubeAnalyticsView({ primaryProject, isLoading, hasErrors, err
     },
   ]
 
-  const viewIsLoading = isLoading || summaryLoading || projectMetricsLoading
-  const viewHasErrors = hasErrors || summaryErrored || projectMetricsErrored
+  const viewIsLoading = isLoading || summaryLoading || platformMetricsLoading
+  const viewHasErrors = hasErrors || summaryErrored || platformMetricsErrored
 
   return (
     <>
@@ -280,7 +279,7 @@ export function YouTubeAnalyticsView({ primaryProject, isLoading, hasErrors, err
           {summarySource?.updatedAt && (
             <span>Updated {new Date(summarySource.updatedAt).toLocaleDateString()}</span>
           )}
-          {primaryProject && <span>{primaryProject.platform.toUpperCase()}</span>}
+          <span>{platform.toUpperCase()}</span>
         </div>
         <div className="flex gap-2 text-[0.7rem] tracking-[0.35em]">
           {RANGE_OPTIONS.map((option) => {
@@ -337,10 +336,12 @@ export function YouTubeAnalyticsView({ primaryProject, isLoading, hasErrors, err
           <section className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-8">
             <header className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
               <div>
-                <h2 className="text-lg font-semibold tracking-tight text-white">YouTube View Trend</h2>
+                <h2 className="text-lg font-semibold tracking-tight text-white">
+                  {platform === 'youtube' ? 'YouTube' : 'Instagram'} View Trend
+                </h2>
                 <p className="text-xs text-slate-500">
-                  Showing the last {selectedRange.label} window · {filteredDailyMetrics.length} daily snapshots derived
-                  from Supabase lifetime totals.
+                  Showing the last {selectedRange.label} window · {filteredDailyMetrics.length} daily snapshots
+                  aggregated across all {platform === 'youtube' ? 'YouTube' : 'Instagram'} projects.
                 </p>
               </div>
               {dayOverDayDelta !== null && (
@@ -363,7 +364,7 @@ export function YouTubeAnalyticsView({ primaryProject, isLoading, hasErrors, err
                   viewBox={`0 0 ${defaultSparklineSize.width} ${defaultSparklineSize.height}`}
                   className="h-64 w-full"
                   role="img"
-                  aria-label="Daily YouTube view counts"
+                  aria-label={`Daily ${platform === 'youtube' ? 'YouTube' : 'Instagram'} view counts`}
                 >
                   <defs>
                     <linearGradient id="sparklineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -392,7 +393,8 @@ export function YouTubeAnalyticsView({ primaryProject, isLoading, hasErrors, err
               </div>
             ) : (
               <p className="mt-6 text-sm text-slate-400">
-                No YouTube metrics available yet for this project. Metrics populate automatically once data arrives from Supabase.
+                No {platform === 'youtube' ? 'YouTube' : 'Instagram'} metrics available yet. Metrics populate
+                automatically once data arrives from Supabase.
               </p>
             )}
           </section>
@@ -442,7 +444,8 @@ export function YouTubeAnalyticsView({ primaryProject, isLoading, hasErrors, err
               </dl>
             ) : (
               <p className="mt-6 text-sm text-slate-400">
-                Once YouTube metrics sync, the latest daily snapshot will appear here with engagement detail.
+                Once {platform === 'youtube' ? 'YouTube' : 'Instagram'} metrics sync, the latest daily snapshot will
+                appear here with engagement detail.
               </p>
             )}
           </section>
