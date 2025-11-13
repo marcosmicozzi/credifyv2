@@ -1,7 +1,9 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
+import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { RootLayout } from './components/layout/RootLayout'
 import { LoginPage } from './pages/auth/LoginPage'
+import { OAuthCallbackPage } from './pages/auth/OAuthCallbackPage'
 import { AnalyticsPage } from './pages/analytics/AnalyticsPage'
 import { DashboardPage } from './pages/dashboard/DashboardPage'
 import { ProfilePage } from './pages/profile/ProfilePage'
@@ -14,12 +16,15 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route element={<RootLayout />}>
-            <Route index element={<DashboardPage />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="/auth/callback" element={<OAuthCallbackPage />} />
+          <Route element={<ProtectedRoute />}>
+            <Route element={<RootLayout />}>
+              <Route index element={<DashboardPage />} />
+              <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
           </Route>
         </Routes>
       </BrowserRouter>

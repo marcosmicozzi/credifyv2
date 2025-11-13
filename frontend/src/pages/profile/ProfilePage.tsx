@@ -1,4 +1,8 @@
+import { useAuth } from '../../providers/AuthProvider'
+
 export function ProfilePage() {
+  const { user } = useAuth()
+
   return (
     <section className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-8">
       <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -19,11 +23,11 @@ export function ProfilePage() {
           <dl className="grid gap-3 text-sm text-slate-400">
             <div className="flex justify-between rounded-lg border border-slate-800/80 bg-slate-900/60 px-4 py-3">
               <dt>Email</dt>
-              <dd className="font-medium text-white">kimberley@credify.app</dd>
+              <dd className="font-medium text-white">{user?.email ?? 'demo@credify.ai'}</dd>
             </div>
             <div className="flex justify-between rounded-lg border border-slate-800/80 bg-slate-900/60 px-4 py-3">
               <dt>Role</dt>
-              <dd className="font-medium text-white">Creator</dd>
+              <dd className="font-medium text-white">{user?.isDemo ? 'Demo Creator' : 'Creator'}</dd>
             </div>
             <div className="flex justify-between rounded-lg border border-slate-800/80 bg-slate-900/60 px-4 py-3">
               <dt>Project Slots</dt>
@@ -37,7 +41,7 @@ export function ProfilePage() {
           <div className="rounded-lg border border-slate-800/80 bg-slate-900/60 p-4">
             <p className="text-sm text-slate-400">OAuth handshake not yet configured in CredifyV2.</p>
             <p className="mt-3 text-xs uppercase tracking-[0.25em] text-slate-500">
-              Use the old Streamlit flow until migration completes.
+              Migration is in progress; this page will handle the flow soon.
             </p>
           </div>
           <button className="inline-flex items-center justify-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-200">

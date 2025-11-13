@@ -3,31 +3,36 @@ alwaysApply: true
 ---
 # Credify Project Overview
 
-This repository contains a Streamlit app that integrates with Supabase and the YouTube Data API.
+CredifyV2 is a full-stack TypeScript project composed of a Vite-powered React SPA and an Express API. It replaces the legacy Streamlit application while preserving the Supabase data model.
 
 ## Entry points and key files
 
-- Main multi-page app: [credify_app.py](mdc:credify_app.py)
-- Auth helpers and login flows: [auth.py](mdc:auth.py)
-- Standalone dashboard (legacy/alternate view): [dashboard.py](mdc:dashboard.py)
-- Standalone ingestion tool: [add_to_supabase.py](mdc:add_to_supabase.py)
-- Standalone claim flow: [claim_role.py](mdc:claim_role.py)
-- Metrics aggregation utility script: [update_user_metrics.py](mdc:update_user_metrics.py)
-- Demo scripts for manual testing:
-  - [test_supabase.py](mdc:test_supabase.py)
-  - [test_youtube_fetch.py](mdc:test_youtube_fetch.py)
+- Frontend SPA entry: `frontend/src/main.tsx` bootstraps the React router and providers.
+- Route pages live under `frontend/src/pages/` (e.g., `dashboard`, `analytics`, `auth/login`).
+- API server entry: `backend/src/server.ts` wires Express middleware and route registration.
+- REST endpoints are defined under `backend/src/routes/` with supporting logic in `backend/src/services/`.
+- Shared Supabase configuration is in `frontend/src/lib/supabaseClient.ts` and `backend/src/config/supabase.ts`.
+- Repository architecture reference: `docs/architecture.md`.
 
 ## Data model (high-level)
 
 - Tables expected in Supabase: `users`, `projects`, `user_projects`, `metrics`, `latest_metrics`, `user_metrics`, `roles`.
 - Users are identified by `u_email` and `u_id`. Projects are keyed by YouTube `p_id`.
 
-## Navigation
+## Frontend navigation
 
-- The Streamlit sidebar in [credify_app.py](mdc:credify_app.py) routes between: Dashboard, Claim Credits, Explore, Settings.
+- React Router controls navigation; see `frontend/src/App.tsx` for layout composition and `frontend/src/components/layout/RootLayout.tsx` for shell scaffolding.
+- Authentication state is managed by `frontend/src/providers/AuthProvider.tsx`, wrapping protected pages via `frontend/src/components/auth/ProtectedRoute.tsx`.
+
+## Backend responsibilities
+
+- Express routes expose auth, metrics, and health endpoints in `backend/src/routes/`.
+- Middleware for error handling and 404s lives in `backend/src/middleware/`.
+- Configuration and environment loading follow `backend/src/config/env.ts`; keep secrets in `.env` files mirrored by `backend/env.example`.
 
 ## Implementation guidance
 
-- Prefer adding shared logic in small helpers (e.g., YouTube fetch, ID extraction) and reuse across pages.
-- Avoid duplicating dashboards or flows; converge on `credify_app.py` unless there is a strong reason.
+- Consolidate shared utilities in `frontend/src/lib/` and `backend/src/services/` to avoid duplication.
+- Prefer typed contracts using `zod` schemas or TypeScript interfaces when exchanging data between frontend and backend.
+- Align Supabase access patterns with the rules in `.cursor/rules/supabase.mdc` and enforce RLS-friendly queries.
 

@@ -1,4 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { useMemo } from 'react'
+
+import { useAuth } from '../../providers/AuthProvider'
 
 const navItems = [
   { label: 'Dashboard', to: '/' },
@@ -11,13 +14,32 @@ const badgeClasses =
   'inline-flex items-center rounded-full border border-slate-700/60 bg-slate-900/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.25em] text-slate-400'
 
 export function RootLayout() {
+  const { user, signOut } = useAuth()
+
+  const userInitials = useMemo(() => {
+    const source = user?.name ?? user?.email ?? ''
+
+    if (!source) {
+      return 'CR'
+    }
+
+    const initials = source
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((segment) => segment[0] ?? '')
+      .join('')
+      .slice(0, 2)
+
+    return initials.toUpperCase() || 'CR'
+  }, [user?.email, user?.name])
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-930 to-slate-900 text-slate-100">
       <div className="grid min-h-screen lg:grid-cols-[18rem_1fr]">
         <aside className="hidden border-r border-slate-900/80 bg-slate-950/90 lg:flex lg:flex-col">
           <div className="flex items-center justify-between px-6 py-6">
             <span className="text-lg font-semibold tracking-tight text-slate-100">CredifyV2</span>
-            <span className={badgeClasses}>beta</span>
+            <span className={badgeClasses}>{user?.isDemo ? 'demo' : 'beta'}</span>
           </div>
           <nav className="mt-4 flex flex-1 flex-col gap-2 px-4">
             {navItems.map((item) => (
@@ -39,7 +61,7 @@ export function RootLayout() {
             ))}
           </nav>
           <div className="border-t border-slate-900/80 px-6 py-6 text-xs text-slate-500">
-            Connected to Supabase • Instagram sync pending
+            Signed in as {user?.email ?? 'unknown'} • Instagram sync pending
           </div>
         </aside>
 
@@ -51,10 +73,22 @@ export function RootLayout() {
                 <span className="hidden sm:inline">Monitor reach, engagement, and collaborations</span>
               </div>
               <div className="flex items-center gap-4">
-                <span className="hidden text-sm text-slate-400 sm:inline">kimberley@credify.app</span>
-                <div className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-800 bg-slate-900 text-sm font-semibold uppercase text-slate-300">
-                  KB
+                <div className="hidden flex-col text-right text-xs text-slate-500 sm:flex">
+                  <span className="text-sm font-medium text-slate-200">{user?.name ?? 'Credify Creator'}</span>
+                  <span>{user?.email ?? 'demo@credify.ai'}</span>
                 </div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-800 bg-slate-900 text-sm font-semibold uppercase text-slate-300">
+                  {userInitials}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void signOut()
+                  }}
+                  className="hidden rounded-xl border border-slate-800/80 bg-slate-900/60 px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 transition hover:bg-slate-800/80 hover:text-slate-100 sm:inline-flex"
+                >
+                  Sign out
+                </button>
               </div>
             </div>
           </header>

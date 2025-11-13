@@ -1,21 +1,24 @@
----
-description: Testing guidelines and security practices for Credify
-globs: *.py
+description: Testing guidelines and security practices for CredifyV2
+globs:
+  - backend/**/*.ts
+  - frontend/**/*.ts
 ---
 # Testing and Security
 
 ## Testing
 
-- Prefer pytest for unit tests.
-- Add tests for YouTube ID extraction and metrics calculations.
-- Mock network calls and Supabase interactions in tests.
-- Treat Streamlit demo scripts ([test_supabase.py](mdc:test_supabase.py), [test_youtube_fetch.py](mdc:test_youtube_fetch.py)) as manual demos, not automated tests.
+- Frontend: use Vitest + React Testing Library for component and hook tests. Co-locate specs with source (`*.test.tsx`).
+- Backend: adopt Vitest or Jest for route/service tests; run against in-memory mocks or a Supabase test project.
+- Mock Supabase and external APIs (Instagram, YouTube) using lightweight fixtures. Never rely on live network calls in automated tests.
+- Cover critical flows: auth state handling, metrics aggregation, and role/permission checks.
+- Track integration test scenarios separately (e.g., Postman collections, backend smoke scripts) and document setup in `docs/`.
 
 ## Security
 
-- Use the anon key only; never store service role keys in client code.
-- Ensure RLS policies exist on user-owned tables (`users`, `user_projects`, `user_metrics`).
-- Escape or avoid unsafe HTML when rendering external or user-provided content in Streamlit.
-- Validate and normalize inputs (emails to lowercase, URLs sanitized) before persisting.
-- Add timeouts and handle unsuccessful responses for all external HTTP requests.
+- Never expose the Supabase service-role key outside the backend. Store environment variables using local `.env` files excluded from git.
+- Enforce RLS policies across `users`, `user_projects`, `user_metrics`, and new tables. Document policy changes via migrations.
+- Sanitize and encode any user-provided or third-party content before rendering in React to avoid XSS.
+- Normalize inputs (lowercase emails, validate URLs) prior to persistence. Reject malformed or unexpected payloads early.
+- All outbound HTTP requests must include timeouts and robust error handling. Log failures with context for observability.
+- Review dependencies regularly; keep ESLint and security linters enabled in CI when configured.
 

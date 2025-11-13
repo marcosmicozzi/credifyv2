@@ -1,26 +1,37 @@
----
-description: Supabase client usage, RLS expectations, and query patterns
-globs: *.py
+description: Supabase client usage, RLS expectations, and query patterns for CredifyV2
+globs:
+  - backend/**/*.ts
+  - frontend/**/*.ts
 ---
 # Supabase Usage
 
 ## Client
 
-- Create the client from Streamlit secrets as in [credify_app.py](mdc:credify_app.py) and [dashboard.py](mdc:dashboard.py).
-- Keep one client per script; do not recreate per request.
+- Frontend: import the singleton from `frontend/src/lib/supabaseClient.ts`. Do not re-create clients inside React components.
+- Backend: use `supabaseAdmin` for privileged actions and `supabasePublic` when emulating anon access (`backend/src/config/supabase.ts`).
+- Derive configuration from `env` modules. Fail fast if `SUPABASE_URL` or keys are missing.
 
 ## RLS and security
 
-- All tables must have Row Level Security enabled and policies restricting access per user when using the anon key from Streamlit secrets.
-- Never embed service keys in the client; only use the anon key.
+- Keep Row Level Security enabled across user-owned tables. Ensure anon-accessible endpoints enforce user scoping in queries.
+- Never ship the service-role key to the browser. Restrict service-role usage to backend-only flows and protect `.env` files.
+- Rotate keys via Supabase dashboard and update environment variables promptly.
 
 ## Query patterns
 
-- Prefer batching over N+1. Use `in_("p_id", pids)` to fetch metrics for many projects at once (see `latest_metrics`).
-- Use `upsert` with `on_conflict` when writing idempotent records, e.g., projects and users.
-- Check `.data` presence defensively before indexing results.
+- Prefer bulk queries over N+1. Use `.in('p_id', ids)` or batched RPC calls where supported.
+- Use `upsert` with `onConflict` for idempotent inserts (projects, metrics snapshots).
+- Handle responses defensively: check `{ data, error }`, throw with context when `error` exists, and guard against `null` data.
+- When chaining queries, use the same client instance to preserve auth/session state.
 
 ## Auth integration
 
-- After OAuth or email/password auth, ensure a row exists in `users` for the email (see [auth.py](mdc:auth.py)).
+- Frontend auth events flow through Supabase Auth helpers; persist sessions via the configured storage key.
+- After OAuth or magic-link callbacks, confirm a `users` row exists. Backend routes should reconcile profiles using `supabaseAdmin`.
+- Use Webhook or edge functions (future) to react to auth events; keep logic centralized so policies stay consistent.
+
+## Performance and caching
+
+- Add indexes when Supabase query plans show sequential scans on frequently filtered columns (document via migrations in `supabase/sql/`).
+- Cache rarely changing metadata in the frontend with React Query; respect invalidation when backend mutations complete.
 

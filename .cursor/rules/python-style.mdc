@@ -1,25 +1,37 @@
+globs:
+  - backend/**/*.ts
+  - frontend/**/*.ts
+description: TypeScript style, typing, and error-handling conventions for CredifyV2
 ---
-globs: *.py
-description: Python style, typing, and error-handling conventions for Credify
----
-# Python Style and Conventions
+# TypeScript Style and Conventions
 
 ## Naming and typing
 
-- Use clear, descriptive names. Prefer full words over abbreviations.
-- Add type hints to function signatures where helpful. Avoid `Any` when possible.
+- Use descriptive names; prefer full words over abbreviations for variables, services, and routes.
+- Export explicit types or interfaces from shared modules (e.g., response DTOs, Supabase row models).
+- Avoid `any`. Reach for `unknown` + narrowing or reusable type definitions in `backend/src/types/`.
+- Co-locate `zod` schemas with the route or service that uses them and infer types via `z.infer`.
 
 ## Control flow
 
-- Prefer guard clauses and early returns to reduce nesting in Streamlit callbacks.
-- Only catch exceptions when you can handle them meaningfully; otherwise let them surface during development.
+- Prefer guard clauses and early returns to reduce nesting inside Express route handlers and React effects.
+- Keep functions focused; extract helpers into `backend/src/services/` or `frontend/src/lib/` when logic grows.
+- Only catch errors when you can add context or map them to API responses. Use centralized error middleware for Express-specific handling.
 
 ## HTTP and IO
 
-- Always specify timeouts for network calls (e.g., requests.get(..., timeout=15)).
-- Validate external data (check presence of keys in JSON before indexing).
+- Always specify timeouts for `axios` or `fetch` requests. Centralize configuration where possible.
+- Validate external data before use (Supabase payloads, third-party APIs). Combine `zod` parsing with type guards to narrow unknown input.
+- Treat environment access (`process.env`) as potentially undefined; surface configuration errors during boot via `backend/src/config/env.ts`.
 
 ## Duplication
 
-- Centralize shared helpers (e.g., YouTube ID extraction and fetch) to avoid drift across files like [credify_app.py](mdc:credify_app.py) and [claim_role.py](mdc:claim_role.py).
+- Centralize shared helpers (e.g., YouTube ID extraction, Supabase row mapping) in reusable modules rather than duplicating inside pages or routes.
+- Reuse React hooks and context providers for shared state (auth, Supabase session) instead of re-implementing per page.
+
+## Formatting and linting
+
+- Run `pnpm lint` (or project-specific npm scripts) before committing.
+- Follow Prettier formatting defaults; do not handwrap code contrary to the formatter.
+- Prefer named exports; default exports only when a module exposes a single primary concept (e.g., a React component page).
 

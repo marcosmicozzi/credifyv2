@@ -1,6 +1,6 @@
 ## CredifyV2 Architecture Overview
 
-CredifyV2 is a clean rebuild of the original Streamlit-based Credify experience. The legacy repository remains untouched and serves only as a conceptual reference. All new implementation lives inside this project, with no shared code or dependencies.
+CredifyV2 is a clean rebuild of the original Credify experience. The legacy repository remains untouched and serves only as a conceptual reference. All new implementation lives inside this project, with no shared code or dependencies.
 
 ### Legacy Continuity
 - **Supabase schema**: Continue using the existing Supabase project, preserving core tables for users, projects, metrics, and roles. Future schema changes are documented and versioned via SQL files in `supabase/sql/`.
@@ -8,7 +8,7 @@ CredifyV2 is a clean rebuild of the original Streamlit-based Credify experience.
 - **Data integrations**: Maintain current Instagram Graph API ingestion pipeline concepts and YouTube metadata enrichment patterns.
 
 ### Rebuilt Differently
-- **Frontend**: React 18 SPA bootstrapped with Vite and TypeScript. Tailwind CSS will drive styling, with reusable components under `frontend/src/components/`. Client-side routing replaces Streamlit's page system.
+- **Frontend**: React 18 SPA bootstrapped with Vite and TypeScript. Tailwind CSS will drive styling, with reusable components under `frontend/src/components/`. Client-side routing powers all navigation.
 - **Backend**: Node.js/Express service written in TypeScript. The server orchestrates Supabase auth validation, Instagram OAuth exchanges, and metrics endpoints under `backend/src/routes/`.
 - **State & Data**: React Query (or equivalent) handles client caching, while the backend exposes REST endpoints mirroring the previous app's features.
 - **Testing & Tooling**: JavaScript/TypeScript linting via ESLint + Prettier, shared configs, and modern build tooling optimized for CI/CD.
