@@ -8,7 +8,7 @@ type ProjectKebabMenuProps = {
   onDelete: () => void
 }
 
-export function ProjectKebabMenu({ project, onEdit, onDelete }: ProjectKebabMenuProps) {
+export function ProjectKebabMenu({ project: _project, onEdit, onDelete }: ProjectKebabMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)

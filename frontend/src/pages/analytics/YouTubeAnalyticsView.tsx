@@ -458,9 +458,7 @@ export function YouTubeAnalyticsView({ platform, isLoading, hasErrors, errorMess
                 >
                   <header className="text-xs uppercase tracking-[0.28em] text-slate-500">{card.label}</header>
                   <p className="mt-5 text-3xl font-semibold tracking-tight text-white">
-                    {card.formatter
-                      ? card.formatter(card.value)
-                      : numberFormatter.format(card.value ?? 0)}
+                    {numberFormatter.format(card.value ?? 0)}
                   </p>
                 </button>
               )
