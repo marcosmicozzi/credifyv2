@@ -264,9 +264,9 @@ async function ensureFreshAccessToken(userId: string, client: OAuth2Client, stor
   }
 
   client.setCredentials({
-    access_token: tokens?.access_token || "",
-    refresh_token: tokens?.refresh_token ?? null,
-    expiry_date: tokens?.expiry_date ?? 0,
+    access_token: storedToken.access_token || "",
+    refresh_token: storedToken.refresh_token ?? null,
+    expiry_date: storedToken.expires_at ? new Date(storedToken.expires_at).getTime() : 0,
   })
 
   if (!storedToken.refresh_token) {
