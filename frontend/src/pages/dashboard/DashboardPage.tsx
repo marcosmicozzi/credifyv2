@@ -266,21 +266,17 @@ export function DashboardPage() {
                       : cardFallback}
               </p>
             </div>
-            <div className="flex flex-col rounded-xl border border-slate-800/70 bg-slate-950/50 p-5">
-              <h3 className="text-sm font-medium text-white">Refresh Sync</h3>
-              <p className="mt-3 text-xs text-slate-500">
-                Pull the latest YouTube metrics across your claimed projects on demand.
-              </p>
+            <div className="flex flex-col items-center justify-center rounded-xl border border-slate-800/70 bg-slate-950/50 p-5">
               <button
                 type="button"
                 onClick={() => refreshMetrics.mutate()}
                 disabled={refreshMetrics.isPending || metricsLoading}
-                className="mt-4 inline-flex items-center justify-center rounded-lg bg-emerald-500/20 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center justify-center rounded-lg bg-emerald-500/20 px-6 py-3 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {refreshMetrics.isPending ? 'Refreshing…' : 'Refresh Sync'}
               </button>
               {refreshMetrics.isSuccess && refreshMetrics.data?.sync?.syncedVideoCount !== undefined && (
-                <p className="mt-3 text-xs text-slate-500">
+                <p className="mt-3 text-center text-xs text-slate-500">
                   Synced {refreshMetrics.data.sync.syncedVideoCount}{' '}
                   {refreshMetrics.data.sync.syncedVideoCount === 1 ? 'video' : 'videos'}
                   {refreshMetrics.data.sync.snapshotDate
@@ -289,10 +285,10 @@ export function DashboardPage() {
                 </p>
               )}
               {refreshMetrics.isSuccess && refreshMetrics.data?.sync?.details && (
-                <p className="mt-1 text-xs text-slate-500">{refreshMetrics.data.sync.details}</p>
+                <p className="mt-1 text-center text-xs text-slate-500">{refreshMetrics.data.sync.details}</p>
               )}
               {refreshErrorMessage && (
-                <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
+                <p className="mt-3 w-full rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-center text-xs text-rose-200">
                   {refreshErrorMessage}
                 </p>
               )}

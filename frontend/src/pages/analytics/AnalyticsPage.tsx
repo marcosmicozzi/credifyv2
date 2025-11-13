@@ -90,6 +90,17 @@ export function AnalyticsPage() {
               Add YouTube Credit
             </button>
           )}
+          {selectedPlatform === 'instagram' && (
+            <button
+              type="button"
+              disabled
+              aria-label="Add Instagram Credit (Coming Soon)"
+              className="inline-flex items-center justify-center rounded-lg border border-slate-700/40 bg-slate-800/30 px-4 py-2 text-sm font-medium text-slate-500/60 cursor-not-allowed opacity-60"
+            >
+              Add Instagram Credit
+              <span className="ml-2 text-xs text-slate-500/50">(Coming Soon)</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -136,6 +147,7 @@ export function AnalyticsPage() {
               isLoading={isLoading}
               hasErrors={hasErrors}
               errorMessage={errorMessage}
+              projectCount={youtubeProjects.length}
             />
           )}
         </>
@@ -177,6 +189,7 @@ export function AnalyticsPage() {
               isLoading={isLoading}
               hasErrors={hasErrors}
               errorMessage={errorMessage}
+              projectCount={instagramProjects.length}
             />
           )}
         </>

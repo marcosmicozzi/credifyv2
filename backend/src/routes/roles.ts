@@ -50,7 +50,14 @@ rolesRouter.get('/', async (req, res, next) => {
       throw error
     }
 
-    res.json({ roles: parsed.data })
+    // Transform snake_case to camelCase for frontend
+    const roles = parsed.data.map((role) => ({
+      roleId: role.role_id,
+      roleName: role.role_name,
+      category: role.category,
+    }))
+
+    res.json({ roles })
   } catch (error) {
     next(error)
   }

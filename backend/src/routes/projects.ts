@@ -396,14 +396,28 @@ projectsRouter.post('/', projectCreationRateLimiter, async (req, res, next) => {
 
     const assignment = payload.assignment ?? null
 
+    // Enforce "one primary role" rule: if roleId is set, clear u_role; if customRole is set, clear role_id
+    const insertData: { u_id: string; p_id: string; role_id: number | null; u_role: string | null } = {
+      u_id: req.auth.userId,
+      p_id: projectId,
+      role_id: null,
+      u_role: null,
+    }
+
+    if (assignment?.roleId !== null && assignment?.roleId !== undefined) {
+      // Predefined role selected: set role_id, clear u_role
+      insertData.role_id = assignment.roleId
+      insertData.u_role = null
+    } else if (assignment?.customRole !== null && assignment?.customRole !== undefined && assignment.customRole.trim()) {
+      // Custom role provided: set u_role, clear role_id
+      insertData.u_role = assignment.customRole.trim()
+      insertData.role_id = null
+    }
+    // If both are null/empty, both remain null (unassigned)
+
     const membership = await supabaseAdmin
       .from('user_projects')
-      .insert({
-        u_id: req.auth.userId,
-        p_id: projectId,
-        role_id: assignment?.roleId ?? null,
-        u_role: assignment?.customRole ?? null,
-      })
+      .insert(insertData)
       .select(
         `
         u_role,
@@ -616,14 +630,28 @@ projectsRouter.post('/claim/youtube', projectCreationRateLimiter, async (req, re
     }
 
     // Insert user_projects (we already checked for existence above)
+    // Enforce "one primary role" rule: if roleId is set, clear u_role; if customRole is set, clear role_id
+    const insertData: { u_id: string; p_id: string; role_id: number | null; u_role: string | null } = {
+      u_id: req.auth.userId,
+      p_id: videoId,
+      role_id: null,
+      u_role: null,
+    }
+
+    if (payload.roleId !== null && payload.roleId !== undefined) {
+      // Predefined role selected: set role_id, clear u_role
+      insertData.role_id = payload.roleId
+      insertData.u_role = null
+    } else if (payload.customRole !== null && payload.customRole !== undefined && payload.customRole.trim()) {
+      // Custom role provided: set u_role, clear role_id
+      insertData.u_role = payload.customRole.trim()
+      insertData.role_id = null
+    }
+    // If both are null/empty, both remain null (unassigned)
+
     const insertMembership = await supabaseAdmin
       .from('user_projects')
-      .insert({
-        u_id: req.auth.userId,
-        p_id: videoId,
-        role_id: payload.roleId ?? null,
-        u_role: payload.customRole ?? null,
-      })
+      .insert(insertData)
       .select(
         `
         u_role,
@@ -804,13 +832,30 @@ projectsRouter.patch('/:projectId', async (req, res, next) => {
     }
 
     // Update user_projects record
+    // Enforce "one primary role" rule: if roleId is set, clear u_role; if customRole is set, clear role_id
     const assignment = payload.assignment ?? null
+    const updateData: { role_id: number | null; u_role: string | null } = {
+      role_id: null,
+      u_role: null,
+    }
+
+    if (assignment?.roleId !== null && assignment?.roleId !== undefined) {
+      // Predefined role selected: set role_id, clear u_role
+      updateData.role_id = assignment.roleId
+      updateData.u_role = null
+    } else if (assignment?.customRole !== null && assignment?.customRole !== undefined && assignment.customRole.trim()) {
+      // Custom role provided: set u_role, clear role_id
+      updateData.u_role = assignment.customRole.trim()
+      updateData.role_id = null
+    } else {
+      // Both are null/empty: clear both (unassigned)
+      updateData.role_id = null
+      updateData.u_role = null
+    }
+
     const updateResult = await supabaseAdmin
       .from('user_projects')
-      .update({
-        role_id: assignment?.roleId ?? null,
-        u_role: assignment?.customRole ?? null,
-      })
+      .update(updateData)
       .eq('u_id', req.auth.userId)
       .eq('p_id', params.projectId)
       .select(

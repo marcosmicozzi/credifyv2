@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 
 import { useUpdateProject, type Project } from '../../hooks/api/projects'
-import { useRoles } from '../../hooks/api/roles'
+import { useRoles, type Role } from '../../hooks/api/roles'
 
 type EditProjectModalProps = {
   isOpen: boolean
@@ -17,6 +17,30 @@ export function EditProjectModal({ isOpen, onClose, project, onSuccess }: EditPr
 
   const { data: roles, isLoading: rolesLoading } = useRoles()
   const updateMutation = useUpdateProject()
+
+  // Group roles by category for optgroups
+  const rolesByCategory = useMemo(() => {
+    if (!roles) return new Map<string, Role[]>()
+    
+    const grouped = new Map<string, Role[]>()
+    for (const role of roles) {
+      const category = role.category ?? 'Other'
+      if (!grouped.has(category)) {
+        grouped.set(category, [])
+      }
+      grouped.get(category)!.push(role)
+    }
+    
+    // Sort categories and roles within each category
+    const sorted = new Map<string, Role[]>()
+    const sortedCategories = Array.from(grouped.keys()).sort()
+    for (const category of sortedCategories) {
+      const categoryRoles = grouped.get(category)!
+      sorted.set(category, categoryRoles.sort((a, b) => a.roleName.localeCompare(b.roleName)))
+    }
+    
+    return sorted
+  }, [roles])
 
   useEffect(() => {
     if (project) {
@@ -102,16 +126,25 @@ export function EditProjectModal({ isOpen, onClose, project, onSuccess }: EditPr
                 value={roleId !== null ? String(roleId) : ''}
                 onChange={(e) => {
                   const value = e.target.value
-                  setRoleId(value ? Number.parseInt(value, 10) : null)
+                  const newRoleId = value ? Number.parseInt(value, 10) : null
+                  setRoleId(newRoleId)
+                  // Clear custom role when a predefined role is selected
+                  if (newRoleId !== null) {
+                    setCustomRole('')
+                  }
                 }}
                 disabled={updateMutation.isPending}
                 className="w-full rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-2 text-white focus:border-emerald-500/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50"
               >
                 <option value="">Select a role...</option>
-                {roles?.map((role) => (
-                  <option key={role.roleId} value={String(role.roleId)}>
-                    {role.roleName} {role.category ? `(${role.category})` : ''}
-                  </option>
+                {Array.from(rolesByCategory.entries()).map(([category, categoryRoles]) => (
+                  <optgroup key={category} label={category}>
+                    {categoryRoles.map((role) => (
+                      <option key={role.roleId} value={String(role.roleId)}>
+                        {role.roleName}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             )}
@@ -125,7 +158,14 @@ export function EditProjectModal({ isOpen, onClose, project, onSuccess }: EditPr
               id="custom-role"
               type="text"
               value={customRole}
-              onChange={(e) => setCustomRole(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value
+                setCustomRole(value)
+                // Clear predefined role when custom role is entered
+                if (value.trim()) {
+                  setRoleId(null)
+                }
+              }}
               placeholder="e.g., Motion Graphics Designer"
               disabled={updateMutation.isPending}
               maxLength={120}

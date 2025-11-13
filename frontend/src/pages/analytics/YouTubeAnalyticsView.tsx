@@ -89,11 +89,12 @@ type YouTubeAnalyticsViewProps = {
   isLoading: boolean
   hasErrors: boolean
   errorMessage: string | null
+  projectCount: number
 }
 
 type SelectedMetric = 'views' | 'likes' | 'comments' | 'followers'
 
-export function YouTubeAnalyticsView({ platform, isLoading, hasErrors, errorMessage }: YouTubeAnalyticsViewProps) {
+export function YouTubeAnalyticsView({ platform, isLoading, hasErrors, errorMessage, projectCount }: YouTubeAnalyticsViewProps) {
   const [selectedRange, setSelectedRange] = useState<RangeOption>(RANGE_OPTIONS[0])
   const [selectedMetric, setSelectedMetric] = useState<SelectedMetric>('views')
 
@@ -363,16 +364,19 @@ export function YouTubeAnalyticsView({ platform, isLoading, hasErrors, errorMess
       label: 'Views',
       value: summarySource?.totalViewCount ?? 0,
       metric: 'views' as SelectedMetric,
+      clickable: true,
     },
     {
       label: 'Likes',
       value: summarySource?.totalLikeCount ?? 0,
       metric: 'likes' as SelectedMetric,
+      clickable: true,
     },
     {
       label: 'Comments',
       value: summarySource?.totalCommentCount ?? 0,
       metric: 'comments' as SelectedMetric,
+      clickable: true,
     },
     // Add Followers card only for Instagram
     ...(platform === 'instagram'
@@ -381,9 +385,17 @@ export function YouTubeAnalyticsView({ platform, isLoading, hasErrors, errorMess
             label: 'Followers',
             value: summarySource?.followerCount ?? 0,
             metric: 'followers' as SelectedMetric,
+            clickable: true,
           },
         ]
       : []),
+    // Add Projects card (non-clickable)
+    {
+      label: 'Projects',
+      value: projectCount,
+      metric: null,
+      clickable: false,
+    },
   ]
 
   const viewIsLoading =
@@ -442,25 +454,38 @@ export function YouTubeAnalyticsView({ platform, isLoading, hasErrors, errorMess
 
       {!viewIsLoading && !viewHasErrors && (
         <>
-          <section className={`grid gap-6 ${platform === 'instagram' ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
+          <section className={`grid gap-6 ${platform === 'instagram' ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
             {summaryCards.map((card) => {
-              const isSelected = selectedMetric === card.metric
+              const isSelected = card.clickable && selectedMetric === card.metric
+              const cardClassName = `rounded-2xl border p-6 text-left shadow-[0_20px_80px_-40px_rgba(15,23,42,0.8)] transition ${
+                isSelected
+                  ? 'border-emerald-500/70 bg-emerald-500/10'
+                  : 'border-slate-800/80 bg-slate-900/40'
+              } ${card.clickable ? 'hover:border-slate-700/80 cursor-pointer' : ''}`
+
+              if (card.clickable) {
+                return (
+                  <button
+                    key={card.label}
+                    type="button"
+                    onClick={() => setSelectedMetric(card.metric as SelectedMetric)}
+                    className={cardClassName}
+                  >
+                    <header className="text-xs uppercase tracking-[0.28em] text-slate-500">{card.label}</header>
+                    <p className="mt-5 text-3xl font-semibold tracking-tight text-white">
+                      {numberFormatter.format(card.value ?? 0)}
+                    </p>
+                  </button>
+                )
+              }
+
               return (
-                <button
-                  key={card.label}
-                  type="button"
-                  onClick={() => setSelectedMetric(card.metric)}
-                  className={`rounded-2xl border p-6 text-left shadow-[0_20px_80px_-40px_rgba(15,23,42,0.8)] transition ${
-                    isSelected
-                      ? 'border-emerald-500/70 bg-emerald-500/10'
-                      : 'border-slate-800/80 bg-slate-900/40 hover:border-slate-700/80'
-                  }`}
-                >
+                <div key={card.label} className={cardClassName}>
                   <header className="text-xs uppercase tracking-[0.28em] text-slate-500">{card.label}</header>
                   <p className="mt-5 text-3xl font-semibold tracking-tight text-white">
                     {numberFormatter.format(card.value ?? 0)}
                   </p>
-                </button>
+                </div>
               )
             })}
           </section>
