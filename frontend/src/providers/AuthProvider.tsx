@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, useCallback } 
 import type { ReactNode } from 'react'
 
 import { apiBaseUrl } from '../lib/env'
+import { apiRequest } from '../lib/apiClient'
 import { supabaseClient } from '../lib/supabaseClient'
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated'
@@ -18,6 +19,8 @@ type AuthSession = {
   type: 'supabase' | 'demo'
   issuedAt: string
   expiresAt?: string | null
+  accessToken: string | null
+  refreshToken: string | null
 }
 
 type AuthContextValue = {
@@ -58,7 +61,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         if (data?.session?.user) {
-          const supabaseUser = data.session.user
+          const supabaseSession = data.session
+          const supabaseUser = supabaseSession.user
 
           setUser({
             id: supabaseUser.id,
@@ -70,15 +74,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
             isDemo: false,
           })
 
+          const issuedAt =
+            (supabaseSession as { created_at?: string | null }).created_at ?? new Date().toISOString()
+
           setSession({
             id: supabaseUser.id,
             type: 'supabase',
-            issuedAt: data.session.created_at,
-            expiresAt: data.session.expires_at ? new Date(data.session.expires_at * 1000).toISOString() : null,
+            issuedAt,
+            expiresAt: supabaseSession.expires_at ? new Date(supabaseSession.expires_at * 1000).toISOString() : null,
+            accessToken: supabaseSession.access_token,
+            refreshToken: supabaseSession.refresh_token ?? null,
           })
 
           clearDemoStorage()
           setStatus('authenticated')
+
+          // Provision user record in public.users
+          try {
+            await apiRequest<{ user: { id: string; email: string; name: string | null } }>(
+              '/api/auth/provision',
+              {
+                method: 'POST',
+                accessToken: supabaseSession.access_token,
+              },
+            )
+          } catch (error) {
+            // Log but don't block authentication if provisioning fails
+            console.warn('[AuthProvider] Failed to provision user record:', error)
+          }
+
           return
         }
       } catch (error) {
@@ -93,10 +117,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const restoredDemoSession = readFromStorage<AuthSession>(DEMO_SESSION_STORAGE_KEY)
 
       if (restoredDemoUser && restoredDemoSession) {
-        setUser({ ...restoredDemoUser, isDemo: true })
-        setSession({ ...restoredDemoSession, type: 'demo' })
-        setStatus('authenticated')
-        return
+        const isExpired =
+          restoredDemoSession.expiresAt && new Date(restoredDemoSession.expiresAt).getTime() <= Date.now()
+
+        if (isExpired || !restoredDemoSession.accessToken) {
+          clearDemoStorage()
+        } else {
+          setUser({ ...restoredDemoUser, isDemo: true })
+          setSession({
+            ...restoredDemoSession,
+            type: 'demo',
+            accessToken: restoredDemoSession.accessToken,
+            refreshToken: restoredDemoSession.refreshToken ?? null,
+          })
+          setStatus('authenticated')
+          return
+        }
       }
 
       setUser(null)
@@ -104,7 +140,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setStatus('unauthenticated')
     }
 
-    const { data: subscription } = supabaseClient.auth.onAuthStateChange((_event, supabaseSession) => {
+    const { data: subscription } = supabaseClient.auth.onAuthStateChange(async (event, supabaseSession) => {
       if (!isMounted) {
         return
       }
@@ -120,17 +156,40 @@ export function AuthProvider({ children }: AuthProviderProps) {
           isDemo: false,
         })
 
+        const issuedAt =
+          (supabaseSession as { created_at?: string | null }).created_at ?? new Date().toISOString()
+
         setSession({
-          id: supabaseSession.access_token,
+          id: supabaseSession.user.id,
           type: 'supabase',
-          issuedAt: supabaseSession.created_at,
+          issuedAt,
           expiresAt: supabaseSession.expires_at
             ? new Date(supabaseSession.expires_at * 1000).toISOString()
             : null,
+          accessToken: supabaseSession.access_token,
+          refreshToken: supabaseSession.refresh_token ?? null,
         })
 
         clearDemoStorage()
         setStatus('authenticated')
+
+        // Provision user record in public.users after sign-in
+        // This is idempotent, so safe to call on every auth state change
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          try {
+            await apiRequest<{ user: { id: string; email: string; name: string | null } }>(
+              '/api/auth/provision',
+              {
+                method: 'POST',
+                accessToken: supabaseSession.access_token,
+              },
+            )
+          } catch (error) {
+            // Log but don't block authentication if provisioning fails
+            // The user can still use the app, and provisioning can be retried
+            console.warn('[AuthProvider] Failed to provision user record:', error)
+          }
+        }
       } else {
         clearDemoStorage()
         setUser(null)
@@ -167,7 +226,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       const payload = (await response.json()) as {
         user: { id: string; email: string; name?: string | null }
-        session: { id: string; type?: string; issuedAt: string; expiresAt?: string | null }
+        session: {
+          id: string
+          type?: string
+          issuedAt: string
+          expiresAt?: string | null
+          accessToken?: string | null
+        }
       }
 
       const demoUser: AuthUser = {
@@ -182,6 +247,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         type: 'demo',
         issuedAt: payload.session.issuedAt,
         expiresAt: payload.session.expiresAt ?? null,
+        accessToken: payload.session.accessToken ?? null,
+        refreshToken: null,
+      }
+
+      if (!demoSession.accessToken) {
+        throw new Error('Demo session did not include an access token.')
       }
 
       setUser(demoUser)

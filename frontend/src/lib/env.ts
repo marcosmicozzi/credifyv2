@@ -8,7 +8,7 @@ type EnvShape = Record<RequiredEnvKey, string> & {
 }
 
 function getEnv(): EnvShape {
-  const env = import.meta.env as EnvShape
+  const env = import.meta.env as unknown as EnvShape
 
   const missing = requiredEnv.filter((key) => !env[key])
 
@@ -17,11 +17,19 @@ function getEnv(): EnvShape {
     throw new Error('Supabase configuration is incomplete')
   }
 
+  const isProduction = import.meta.env.PROD
+
+  if (isProduction && !env.VITE_API_URL) {
+    console.error('Missing required environment variable: VITE_API_URL')
+    throw new Error('API configuration is incomplete')
+  }
+
   return env
 }
 
 export const env = getEnv()
 
 export const apiBaseUrl =
-  env.VITE_API_URL?.replace(/\/$/, '') || `${window.location.origin.replace(/\/$/, '')}`
+  env.VITE_API_URL?.replace(/\/$/, '') ||
+  (import.meta.env.DEV ? 'http://localhost:3000' : `${window.location.origin.replace(/\/$/, '')}`)
 

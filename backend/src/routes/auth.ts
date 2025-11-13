@@ -1,85 +1,20 @@
-import type { RequestHandler } from 'express'
 import { Router } from 'express'
-import { z } from 'zod'
+import jwt from 'jsonwebtoken'
 
 import { env } from '../config/env.js'
-import { supabaseAdmin, supabasePublic } from '../config/supabase.js'
-
-const emailSchema = z.object({
-  email: z.string().email(),
-})
-
-const ensureSupabasePublic = () => {
-  if (!supabasePublic) {
-    const error = new Error('Supabase public client is not configured. Check SUPABASE_ANON_KEY.')
-    error.name = 'ConfigurationError'
-    ;(error as { status?: number }).status = 500
-    throw error
-  }
-  return supabasePublic
-}
-
-const requestMagicLink: RequestHandler = async (req, res, next) => {
-  try {
-    const { email } = emailSchema.parse(req.body)
-    const supabase = ensureSupabasePublic()
-
-    const emailRedirectTo =
-      env.SUPABASE_EMAIL_REDIRECT_URL ?? `${req.protocol}://${req.get('host') ?? 'localhost'}/auth/callback`
-
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo,
-        shouldCreateUser: true,
-      },
-    })
-
-    if (error) {
-      return res.status(error.status ?? 400).json({
-        error: 'SupabaseAuthError',
-        message: error.message,
-      })
-    }
-
-    res.status(200).json({
-      status: 'OK',
-      message: 'Magic link sent if the email address is registered.',
-    })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      res.status(400).json({
-        error: 'ValidationError',
-        message: 'Please provide a valid email address.',
-        details: error.flatten().fieldErrors,
-      })
-      return
-    }
-
-    if (error instanceof Error && 'status' in error && typeof error.status === 'number') {
-      res.status(error.status).json({
-        error: error.name,
-        message: error.message,
-      })
-      return
-    }
-
-    next(error)
-  }
-}
+import { supabaseAdmin } from '../config/supabase.js'
+import { authenticate } from '../middleware/authenticate.js'
+import { demoAuthRateLimiter, userProvisioningRateLimiter } from '../middleware/rateLimit.js'
+import { provisionUser } from '../services/userProvisioning.js'
 
 export const authRouter = Router()
 
-authRouter.post('/email', requestMagicLink)
+const DEMO_USER_EMAIL = env.DEMO_USER_EMAIL
+const DEMO_USER_NAME = env.DEMO_USER_NAME
+const DEMO_USER_ID = env.DEMO_USER_ID
+const DEMO_TOKEN_TTL_SECONDS = 60 * 60 * 6 // 6 hours
 
-// Google OAuth is now handled directly by the frontend using supabaseClient.auth.signInWithOAuth()
-// This ensures PKCE verifier/state is properly managed in the browser where the OAuth flow originates.
-// The backend endpoint was removed to prevent PKCE verifier mismatch errors.
-
-const DEMO_USER_EMAIL = 'demo@credify.ai'
-const DEMO_USER_NAME = 'Credify Demo User'
-
-authRouter.post('/demo', async (_req, res, next) => {
+authRouter.post('/demo', demoAuthRateLimiter, async (_req, res, next) => {
   try {
     if (!supabaseAdmin) {
       const error = new Error('Supabase admin client is not configured. Check SUPABASE_SERVICE_ROLE_KEY.')
@@ -105,6 +40,7 @@ authRouter.post('/demo', async (_req, res, next) => {
       const insertResult = await supabaseAdmin
         .from('users')
         .insert({
+          u_id: DEMO_USER_ID,
           u_email: DEMO_USER_EMAIL,
           u_name: DEMO_USER_NAME,
         })
@@ -125,17 +61,98 @@ authRouter.post('/demo', async (_req, res, next) => {
       throw error
     }
 
+    if (userRecord.u_id !== DEMO_USER_ID) {
+      const error = new Error(
+        `Configured demo user id (${DEMO_USER_ID}) does not match database record (${userRecord.u_id}).`,
+      )
+      error.name = 'DemoUserMismatchError'
+      ;(error as { status?: number }).status = 500
+      throw error
+    }
+
+    const issuedAtSeconds = Math.floor(Date.now() / 1000)
+    const expiresAtSeconds = issuedAtSeconds + DEMO_TOKEN_TTL_SECONDS
+
+    const accessToken = jwt.sign(
+      {
+        aud: 'authenticated',
+        exp: expiresAtSeconds,
+        sub: DEMO_USER_ID,
+        email: DEMO_USER_EMAIL,
+        role: 'authenticated',
+        name: userRecord.u_name ?? DEMO_USER_NAME,
+        app_metadata: {
+          provider: 'credify_demo',
+          providers: ['credify_demo'],
+        },
+        user_metadata: {
+          full_name: userRecord.u_name ?? DEMO_USER_NAME,
+          name: userRecord.u_name ?? DEMO_USER_NAME,
+          demo: true,
+        },
+        demo: true,
+        iss: `${env.SUPABASE_URL}/auth/v1`,
+        iat: issuedAtSeconds,
+        nbf: issuedAtSeconds,
+      },
+      env.SUPABASE_JWT_SECRET,
+      {
+        algorithm: 'HS256',
+      },
+    )
+
     res.status(200).json({
       mode: 'demo',
       user: {
-        id: userRecord.u_id,
+        id: DEMO_USER_ID,
         email: userRecord.u_email,
         name: userRecord.u_name ?? DEMO_USER_NAME,
       },
       session: {
-        id: `demo-${userRecord.u_id}`,
+        id: `demo-${DEMO_USER_ID}`,
         type: 'demo',
-        issuedAt: new Date().toISOString(),
+        issuedAt: new Date(issuedAtSeconds * 1000).toISOString(),
+        expiresAt: new Date(expiresAtSeconds * 1000).toISOString(),
+        accessToken,
+      },
+    })
+  } catch (error) {
+    next(error)
+  }
+})
+
+/**
+ * POST /api/auth/provision
+ * Ensures a user record exists in public.users for the authenticated user.
+ * This endpoint is idempotent and should be called after successful OAuth sign-in.
+ */
+authRouter.post('/provision', userProvisioningRateLimiter, authenticate, async (req, res, next) => {
+  try {
+    if (!req.auth) {
+      res.status(500).json({
+        error: 'AuthContextMissing',
+        message: 'Authentication context is not available on the request.',
+      })
+      return
+    }
+
+    // Only provision for real Supabase users, not demo users
+    if (req.auth.isDemo || req.auth.sessionType !== 'supabase') {
+      res.status(400).json({
+        error: 'InvalidRequest',
+        message: 'User provisioning is only available for authenticated Supabase users.',
+      })
+      return
+    }
+
+    const user = await provisionUser(req.auth.user)
+
+    res.status(200).json({
+      user: {
+        id: user.u_id,
+        email: user.u_email,
+        name: user.u_name,
+        createdAt: user.u_created_at,
       },
     })
   } catch (error) {

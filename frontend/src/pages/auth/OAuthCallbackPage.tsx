@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
+import { apiRequest } from '../../lib/apiClient'
 import { supabaseClient } from '../../lib/supabaseClient'
 
 type CallbackState = 'idle' | 'processing' | 'success' | 'error'
@@ -76,7 +77,7 @@ export function OAuthCallbackPage() {
       try {
         setState('processing')
 
-        let hasActiveSession = false
+        let session = null
 
         if (code) {
           const { data, error } = await supabaseClient.auth.exchangeCodeForSession(code)
@@ -86,8 +87,11 @@ export function OAuthCallbackPage() {
             throw new Error(error.message)
           }
 
-          hasActiveSession = Boolean(data?.session)
+          session = data?.session ?? null
         } else if (accessToken) {
+          if (!refreshToken) {
+            throw new Error('Supabase callback is missing a refresh token.')
+          }
           const { data, error } = await supabaseClient.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
@@ -98,25 +102,42 @@ export function OAuthCallbackPage() {
             throw new Error(error.message)
           }
 
-          hasActiveSession = Boolean(data?.session)
+          session = data?.session ?? null
         } else {
           const { data, error } = await supabaseClient.auth.getSession()
           if (error) {
             throw new Error(error.message)
           }
-          hasActiveSession = Boolean(data.session)
+          session = data?.session ?? null
         }
 
-        if (!hasActiveSession) {
+        // Fallback: try to get session one more time
+        if (!session) {
           const { data, error } = await supabaseClient.auth.getSession()
           if (error) {
             throw new Error(error.message)
           }
-          hasActiveSession = Boolean(data.session)
+          session = data?.session ?? null
         }
 
-        if (!hasActiveSession) {
+        if (!session) {
           throw new Error('Supabase returned no session for the authorization response.')
+        }
+
+        // Provision user record in public.users after successful OAuth
+        if (session.access_token) {
+          try {
+            await apiRequest<{ user: { id: string; email: string; name: string | null } }>(
+              '/api/auth/provision',
+              {
+                method: 'POST',
+                accessToken: session.access_token,
+              },
+            )
+          } catch (error) {
+            // Log but don't block authentication if provisioning fails
+            console.warn('[OAuthCallback] Failed to provision user record:', error)
+          }
         }
 
         window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)

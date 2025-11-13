@@ -3,6 +3,10 @@ import { Router } from 'express'
 
 import { authRouter } from './auth.js'
 import { healthRouter } from './health.js'
+import { metricsRouter } from './metrics.js'
+import { projectsRouter } from './projects.js'
+import { rolesRouter } from './roles.js'
+import { integrationsRouter } from './integrations.js'
 
 const notImplemented = (message: string): RequestHandler => (_req, res) => {
   res.status(501).json({
@@ -22,6 +26,10 @@ apiRouter.get('/', (_req, res) => {
 
 apiRouter.use('/health', healthRouter)
 apiRouter.use('/auth', authRouter)
+apiRouter.use('/projects', projectsRouter)
+apiRouter.use('/metrics', metricsRouter)
+apiRouter.use('/roles', rolesRouter)
+apiRouter.use('/integrations', integrationsRouter)
 
 apiRouter.get('/auth/instagram', notImplemented('Instagram OAuth initiation pending implementation'))
 apiRouter.get('/auth/instagram/callback', notImplemented('Instagram OAuth callback pending implementation'))
@@ -30,5 +38,4 @@ apiRouter.get('/insights/fetch', notImplemented('Metrics fetch pending implement
 apiRouter.post('/insights/refresh', notImplemented('Metrics refresh pending implementation'))
 
 apiRouter.get('/users/profile', notImplemented('User profile enrichment pending implementation'))
-apiRouter.get('/projects/list', notImplemented('Projects listing pending implementation'))
 

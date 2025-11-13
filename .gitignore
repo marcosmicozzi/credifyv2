@@ -1,6 +1,9 @@
 .env
 backend/.env
 frontend/.env
+Roadblocks/
+
+
 
 # Node build artifacts
 node_modules

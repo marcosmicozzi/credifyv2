@@ -1,17 +1,12 @@
 import { useEffect, useState } from 'react'
-import type { FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
-import { apiBaseUrl } from '../../lib/env'
 import { supabaseClient } from '../../lib/supabaseClient'
 import { useAuth } from '../../providers/AuthProvider'
 
 type RequestState = 'idle' | 'loading' | 'success' | 'error'
 
 export function LoginPage() {
-  const [email, setEmail] = useState('')
-  const [status, setStatus] = useState<RequestState>('idle')
-  const [message, setMessage] = useState<string | null>(null)
   const [googleStatus, setGoogleStatus] = useState<RequestState>('idle')
   const [googleMessage, setGoogleMessage] = useState<string | null>(null)
   const [demoStatus, setDemoStatus] = useState<RequestState>('idle')
@@ -29,41 +24,6 @@ export function LoginPage() {
       navigate(redirectPath, { replace: true })
     }
   }, [authStatus, navigate, redirectPath])
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (!email) {
-      setMessage('Please enter a valid email address.')
-      setStatus('error')
-      return
-    }
-
-    try {
-      setStatus('loading')
-      setMessage(null)
-
-      const response = await fetch(`${apiBaseUrl}/api/auth/email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      })
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
-        const errorMessage = (data as { message?: string }).message ?? 'Failed to send magic link.'
-        throw new Error(errorMessage)
-      }
-
-      setStatus('success')
-      setMessage(`Check ${email} for your sign-in link.`)
-    } catch (error) {
-      setStatus('error')
-      setMessage(error instanceof Error ? error.message : 'Unexpected error while sending magic link.')
-      setStatus('error')
-    }
-  }
 
   const handleGoogleSignIn = async () => {
     try {
@@ -143,42 +103,12 @@ export function LoginPage() {
       <section className="mx-auto flex w-full max-w-md flex-col gap-6 rounded-2xl border border-slate-800/80 bg-slate-900/50 p-8 text-center shadow-[0_30px_120px_-60px_rgba(15,23,42,0.9)]">
         <span className="text-xs uppercase tracking-[0.35em] text-slate-500">Welcome back</span>
         <h1 className="text-3xl font-semibold tracking-tight text-white">Access CredifyV2</h1>
-        <p className="text-sm text-slate-400">
-          Sign in with your verified creator email. A Supabase magic link will land in your inbox.
-        </p>
-        <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="you@example.com"
-            autoComplete="email"
-            className="rounded-xl border border-slate-800/80 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-600/60"
-          />
-          <button
-            type="submit"
-            className="inline-flex items-center justify-center rounded-xl bg-white/90 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-white/50 disabled:cursor-not-allowed disabled:bg-slate-400/20 disabled:text-slate-500"
-            disabled={status === 'loading'}
-          >
-            {status === 'loading' ? 'Sending…' : 'Send Magic Link'}
-          </button>
-        </form>
-        {message && (
-          <div
-            className={`rounded-xl border px-4 py-3 text-sm ${
-              status === 'success'
-                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
-                : 'border-rose-500/30 bg-rose-500/10 text-rose-200'
-            }`}
-          >
-            {message}
-          </div>
-        )}
+        <p className="text-sm text-slate-400">Sign in with Google or explore the app instantly in demo mode.</p>
         <div className="flex flex-col gap-3">
           <div className="relative flex items-center justify-center">
             <span className="absolute left-0 right-0 h-px bg-slate-800" />
             <span className="relative bg-slate-900/50 px-3 text-xs uppercase tracking-[0.3em] text-slate-500">
-              or
+              continue with Google
             </span>
           </div>
           <button
@@ -200,7 +130,7 @@ export function LoginPage() {
             <div>
               <h2 className="text-sm font-semibold text-white">Demo Mode</h2>
               <p className="mt-1 text-xs text-slate-400">
-                Use a temporary workspace account while Google OAuth is being reconfigured.
+                Explore the workspace with a temporary account—no Google sign-in required.
               </p>
             </div>
             <span className="rounded-full border border-slate-700/60 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.3em] text-slate-500">

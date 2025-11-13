@@ -6,7 +6,6 @@ export function errorHandler(err, _req, res, next) {
     const status = err.status ?? err.statusCode ?? 500;
     const message = err.expose ? err.message : 'Unexpected error occurred';
     if (process.env.NODE_ENV !== 'test') {
-        // eslint-disable-next-line no-console
         console.error(err);
     }
     res.status(status).json({

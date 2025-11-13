@@ -6,4 +6,12 @@ export const supabaseAdmin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE
         persistSession: false,
     },
 });
+export const supabasePublic = env.SUPABASE_ANON_KEY
+    ? createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+        auth: {
+            autoRefreshToken: true,
+            persistSession: false,
+        },
+    })
+    : null;
 //# sourceMappingURL=supabase.js.map

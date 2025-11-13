@@ -4,7 +4,7 @@ CredifyV2 is a clean rebuild of the original Credify experience. The legacy repo
 
 ### Legacy Continuity
 - **Supabase schema**: Continue using the existing Supabase project, preserving core tables for users, projects, metrics, and roles. Future schema changes are documented and versioned via SQL files in `supabase/sql/`.
-- **Authentication flows**: Supabase email magic-link login and Instagram OAuth remain the primary identity mechanisms.
+- **Authentication flows**: Supabase Google OAuth and demo mode provide access while Instagram OAuth remains planned for creators.
 - **Data integrations**: Maintain current Instagram Graph API ingestion pipeline concepts and YouTube metadata enrichment patterns.
 
 ### Rebuilt Differently
