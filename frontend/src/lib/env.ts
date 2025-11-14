@@ -17,11 +17,12 @@ function getEnv(): EnvShape {
     throw new Error('Supabase configuration is incomplete')
   }
 
+  // Note: VITE_API_URL is optional - will default to same origin in production
+  // Only warn in production if not set, but don't throw (allows build to complete)
   const isProduction = import.meta.env.PROD
 
   if (isProduction && !env.VITE_API_URL) {
-    console.error('Missing required environment variable: VITE_API_URL')
-    throw new Error('API configuration is incomplete')
+    console.warn('VITE_API_URL not set in production - will default to same origin')
   }
 
   return env
