@@ -43,7 +43,7 @@ export function ProjectCard({ project, onEdit, onDelete, showActions = false }: 
           <div className="rounded-md border border-slate-800/70 bg-slate-950/80 px-2 py-1 text-[0.65rem] uppercase tracking-[0.1em] text-slate-400 backdrop-blur-sm">
             {project.platform.toUpperCase()}
           </div>
-          {showActions && project.platform === 'youtube' && onEdit && onDelete && (
+          {showActions && onEdit && onDelete && (
             <ProjectKebabMenu
               project={project}
               onEdit={() => onEdit(project)}

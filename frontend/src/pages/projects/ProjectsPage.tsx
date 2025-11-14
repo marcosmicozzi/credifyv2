@@ -155,9 +155,9 @@ export function ProjectsPage() {
               <ProjectCard
                 key={project.id}
                 project={project}
-                onEdit={selectedPlatform === 'youtube' ? setEditingProject : undefined}
-                onDelete={selectedPlatform === 'youtube' ? setDeletingProject : undefined}
-                showActions={selectedPlatform === 'youtube'}
+                onEdit={setEditingProject}
+                onDelete={setDeletingProject}
+                showActions={true}
               />
             ))}
           </div>
