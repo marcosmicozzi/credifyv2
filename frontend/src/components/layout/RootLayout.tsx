@@ -65,7 +65,9 @@ export function RootLayout() {
                   }}
                 />
               ) : (
-                <div className="h-full w-full bg-slate-800/50" />
+                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900 text-2xl font-semibold text-slate-300">
+                  {userInitials}
+                </div>
               )}
             </div>
           </div>

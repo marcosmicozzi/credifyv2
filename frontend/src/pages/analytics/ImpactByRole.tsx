@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, type PieLabelRenderProps } from 'recharts'
 
+import { ApiError } from '../../lib/apiClient'
 import { useRoleImpact, type RoleImpactParams } from '../../hooks/api/metrics'
 
 const COLORS = [
@@ -119,10 +120,42 @@ export function ImpactByRole({ platform }: ImpactByRoleProps) {
   }
 
   if (isError) {
+    let errorMessage = 'Failed to load impact by role data.'
+    let errorDetails: string | null = null
+
+    if (error instanceof ApiError) {
+      if (error.status === 404) {
+        errorMessage = 'Role impact endpoint not found. Please check your backend deployment.'
+        errorDetails = `Route: ${error.message}`
+      } else if (error.status === 401 || error.status === 403) {
+        errorMessage = 'Authentication required. Please sign in again.'
+      } else if (error.status >= 500) {
+        errorMessage = 'Server error. Please try again later.'
+        errorDetails = error.message
+      } else {
+        errorMessage = error.message || 'Failed to load impact by role data.'
+        if (error.body && typeof error.body === 'object' && 'details' in error.body) {
+          errorDetails = JSON.stringify(error.body.details, null, 2)
+        }
+      }
+    } else if (error instanceof Error) {
+      errorMessage = error.message
+    }
+
     return (
       <article className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-8">
-        <div className="text-sm text-rose-200">
-          {error instanceof Error ? error.message : 'Failed to load impact by role data.'}
+        <div className="space-y-2">
+          <div className="text-sm font-semibold text-rose-200">{errorMessage}</div>
+          {errorDetails && (
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs text-rose-300/80 hover:text-rose-300">
+                Error details
+              </summary>
+              <pre className="mt-2 overflow-auto rounded border border-rose-500/20 bg-rose-950/30 p-2 text-xs text-rose-200/80">
+                {errorDetails}
+              </pre>
+            </details>
+          )}
         </div>
       </article>
     )
