@@ -8,9 +8,15 @@ export declare const env: {
     DEMO_USER_ID: string;
     DEMO_USER_EMAIL: string;
     DEMO_USER_NAME: string;
-    INSTAGRAM_CLIENT_ID?: string | undefined;
-    INSTAGRAM_CLIENT_SECRET?: string | undefined;
+    INSTAGRAM_GRAPH_API_BASE: string;
+    INSTAGRAM_REQUIRED_SCOPES: string;
+    YOUTUBE_API_KEY: string;
+    CRON_SECRET: string;
+    INSTAGRAM_APP_ID?: string | undefined;
+    INSTAGRAM_APP_SECRET?: string | undefined;
     INSTAGRAM_REDIRECT_URI?: string | undefined;
-    YOUTUBE_API_KEY?: string | undefined;
+    YOUTUBE_CLIENT_ID?: string | undefined;
+    YOUTUBE_CLIENT_SECRET?: string | undefined;
+    YOUTUBE_OAUTH_REDIRECT_URI?: string | undefined;
 };
 //# sourceMappingURL=env.d.ts.map
