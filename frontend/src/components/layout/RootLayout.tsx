@@ -35,9 +35,9 @@ export function RootLayout() {
   }, [user?.email, user?.name])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-930 to-slate-900 text-slate-100">
-      <div className="grid min-h-screen lg:grid-cols-[18rem_1fr]">
-        <aside className="hidden border-r border-slate-900/80 bg-slate-950/90 lg:flex lg:flex-col">
+    <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-930 to-slate-900 text-slate-100">
+      <div className="grid h-screen lg:grid-cols-[18rem_1fr]">
+        <aside className="hidden h-screen border-r border-slate-900/80 bg-slate-950/90 lg:flex lg:flex-col lg:overflow-y-auto">
           <div className="flex items-center justify-between px-6 py-6">
             <span className="text-lg font-semibold tracking-tight text-slate-100">CredifyV2</span>
             <span className={badgeClasses}>{user?.isDemo ? 'demo' : 'beta'}</span>
@@ -66,7 +66,7 @@ export function RootLayout() {
           </div>
         </aside>
 
-        <div className="flex min-h-screen flex-col">
+        <div className="flex h-screen flex-col overflow-y-auto">
           <header className="border-b border-slate-900/80 bg-slate-950/60 backdrop-blur">
             <div className="flex items-center justify-between px-6 py-5">
               <div className="flex items-center gap-3 text-sm text-slate-400">
