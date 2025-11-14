@@ -104,18 +104,37 @@ activityRouter.get('/', async (req, res, next) => {
       }> = []
 
       projectActivities?.forEach((up) => {
-        const user = up.users as {
+        // Handle users as array or single object (inner join should be single, but TypeScript needs union)
+        const usersRaw = up.users as {
           u_id: string
           u_name: string | null
           u_email: string
           profile_image_url: string | null
-        }
-        const project = up.projects as {
+        } | {
+          u_id: string
+          u_name: string | null
+          u_email: string
+          profile_image_url: string | null
+        }[] | null
+        const user = Array.isArray(usersRaw) ? usersRaw[0] : usersRaw
+        
+        // Handle projects as array or single object
+        const projectsRaw = up.projects as {
           p_title: string | null
           p_platform: string
           p_thumbnail_url: string | null
-        } | null
-        const role = up.roles as { role_name: string } | null
+        } | {
+          p_title: string | null
+          p_platform: string
+          p_thumbnail_url: string | null
+        }[] | null
+        const project = Array.isArray(projectsRaw) ? projectsRaw[0] : projectsRaw
+        
+        // Handle roles as array or single object
+        const rolesRaw = up.roles as { role_name: string } | { role_name: string }[] | null
+        const role = Array.isArray(rolesRaw) ? rolesRaw[0] : rolesRaw
+
+        if (!user) return
 
         activities.push({
           type: 'project_claimed',
@@ -137,12 +156,21 @@ activityRouter.get('/', async (req, res, next) => {
       })
 
       instagramActivities?.forEach((token) => {
-        const user = token.users as {
+        // Handle users as array or single object (inner join should be single, but TypeScript needs union)
+        const usersRaw = token.users as {
           u_id: string
           u_name: string | null
           u_email: string
           profile_image_url: string | null
-        }
+        } | {
+          u_id: string
+          u_name: string | null
+          u_email: string
+          profile_image_url: string | null
+        }[] | null
+        const user = Array.isArray(usersRaw) ? usersRaw[0] : usersRaw
+
+        if (!user) return
 
         activities.push({
           type: 'instagram_connected',
@@ -224,18 +252,37 @@ activityRouter.get('/', async (req, res, next) => {
       }> = []
 
       projectActivities?.forEach((up) => {
-        const user = up.users as {
+        // Handle users as array or single object (inner join should be single, but TypeScript needs union)
+        const usersRaw = up.users as {
           u_id: string
           u_name: string | null
           u_email: string
           profile_image_url: string | null
-        }
-        const project = up.projects as {
+        } | {
+          u_id: string
+          u_name: string | null
+          u_email: string
+          profile_image_url: string | null
+        }[] | null
+        const user = Array.isArray(usersRaw) ? usersRaw[0] : usersRaw
+        
+        // Handle projects as array or single object
+        const projectsRaw = up.projects as {
           p_title: string | null
           p_platform: string
           p_thumbnail_url: string | null
-        } | null
-        const role = up.roles as { role_name: string } | null
+        } | {
+          p_title: string | null
+          p_platform: string
+          p_thumbnail_url: string | null
+        }[] | null
+        const project = Array.isArray(projectsRaw) ? projectsRaw[0] : projectsRaw
+        
+        // Handle roles as array or single object
+        const rolesRaw = up.roles as { role_name: string } | { role_name: string }[] | null
+        const role = Array.isArray(rolesRaw) ? rolesRaw[0] : rolesRaw
+
+        if (!user) return
 
         activities.push({
           type: 'project_claimed',
@@ -257,12 +304,21 @@ activityRouter.get('/', async (req, res, next) => {
       })
 
       instagramActivities?.forEach((token) => {
-        const user = token.users as {
+        // Handle users as array or single object (inner join should be single, but TypeScript needs union)
+        const usersRaw = token.users as {
           u_id: string
           u_name: string | null
           u_email: string
           profile_image_url: string | null
-        }
+        } | {
+          u_id: string
+          u_name: string | null
+          u_email: string
+          profile_image_url: string | null
+        }[] | null
+        const user = Array.isArray(usersRaw) ? usersRaw[0] : usersRaw
+
+        if (!user) return
 
         activities.push({
           type: 'instagram_connected',

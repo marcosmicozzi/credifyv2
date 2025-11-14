@@ -6,7 +6,9 @@
 ## Overview
 Added ability for users to edit their display name on the Profile page, which is then used consistently throughout the app (dashboard heading, search results, etc.).
 
-## Files Changed (9 files, +428 lines, -52 lines)
+## Files Changed (10 files, +428 lines, -52 lines)
+
+**Note:** TypeScript build fixes applied to resolve TS2352 errors in Supabase query result handling.
 
 ### Backend Changes
 
@@ -171,12 +173,37 @@ git restore frontend/src/providers/AuthProvider.tsx
 git restore <file-path>
 ```
 
+## TypeScript Build Fixes
+
+### Issue: TS2352 Type Conversion Errors
+Supabase query results with joins can return arrays or single objects. TypeScript was complaining about unsafe type conversions.
+
+### Fixes Applied:
+1. **`backend/src/routes/users.ts`** (lines 181-183, 327-362):
+   - Fixed role handling in search endpoint to handle array/single object
+   - Fixed project and role handling in user profile endpoint
+   - Added null checks and array handling
+
+2. **`backend/src/routes/activity.ts`** (lines 107-137, 158-187, 254-303, 306-335):
+   - Fixed user, project, and role handling in all activity endpoints
+   - Added null checks for all joined data
+   - Handles both array and single object responses from Supabase
+
+**Pattern used:**
+```typescript
+// Handle as array or single object
+const dataRaw = up.relation as Type | Type[] | null
+const data = Array.isArray(dataRaw) ? dataRaw[0] : dataRaw
+if (!data) return // Skip if null
+```
+
 ## Notes for Production Deployment
 
 1. **Backend must be deployed first** - The new `/api/users/me` endpoints need to be live
 2. **CORS is configured** - Should work with production frontend
 3. **No database migrations needed** - Uses existing `u_name` column
 4. **Console logs present** - Consider removing for production (currently helpful for debugging)
+5. **TypeScript build passes** - All TS2352 errors resolved
 
 ## Potential Issues & Solutions
 
