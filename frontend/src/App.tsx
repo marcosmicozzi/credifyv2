@@ -5,7 +5,9 @@ import { RootLayout } from './components/layout/RootLayout'
 import { LoginPage } from './pages/auth/LoginPage'
 import { OAuthCallbackPage } from './pages/auth/OAuthCallbackPage'
 import { AnalyticsPage } from './pages/analytics/AnalyticsPage'
+import { CreatorProfilePage } from './pages/creator/CreatorProfilePage'
 import { DashboardPage } from './pages/dashboard/DashboardPage'
+import { ExplorePage } from './pages/explore/ExplorePage'
 import { ProfilePage } from './pages/profile/ProfilePage'
 import { ProjectsPage } from './pages/projects/ProjectsPage'
 import { SettingsPage } from './pages/settings/SettingsPage'
@@ -22,9 +24,11 @@ function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<RootLayout />}>
               <Route index element={<DashboardPage />} />
+              <Route path="/explore" element={<ExplorePage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/creator/:userId" element={<CreatorProfilePage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/tutorial" element={<TutorialPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />

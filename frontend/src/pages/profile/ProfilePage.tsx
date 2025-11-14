@@ -1,8 +1,10 @@
 import { useAuth } from '../../providers/AuthProvider'
+import { useUserStats } from '../../hooks/api/users'
 import { InstagramIntegrationCard } from '../settings/InstagramIntegrationCard'
 
 export function ProfilePage() {
   const { user } = useAuth()
+  const { data: stats, isLoading: statsLoading } = useUserStats(user?.id ?? null)
 
   return (
     <section className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-8">
@@ -36,6 +38,31 @@ export function ProfilePage() {
 
         <div className="lg:col-span-1">
           <InstagramIntegrationCard />
+        </div>
+      </div>
+
+      {/* Social Stats */}
+      <div className="mt-6">
+        <h2 className="mb-4 text-lg font-semibold text-white">Social Stats</h2>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="rounded-xl border border-slate-800/70 bg-slate-950/50 p-4 text-center">
+            <div className="text-2xl font-semibold text-white">
+              {statsLoading ? '...' : stats?.followers ?? 0}
+            </div>
+            <div className="mt-1 text-xs text-slate-400">Followers</div>
+          </div>
+          <div className="rounded-xl border border-slate-800/70 bg-slate-950/50 p-4 text-center">
+            <div className="text-2xl font-semibold text-white">
+              {statsLoading ? '...' : stats?.following ?? 0}
+            </div>
+            <div className="mt-1 text-xs text-slate-400">Following</div>
+          </div>
+          <div className="rounded-xl border border-slate-800/70 bg-slate-950/50 p-4 text-center">
+            <div className="text-2xl font-semibold text-white">
+              {statsLoading ? '...' : stats?.collaborators ?? 0}
+            </div>
+            <div className="mt-1 text-xs text-slate-400">Collaborators</div>
+          </div>
         </div>
       </div>
     </section>

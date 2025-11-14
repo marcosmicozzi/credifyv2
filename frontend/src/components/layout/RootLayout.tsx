@@ -3,10 +3,12 @@ import { useMemo, useState, useEffect } from 'react'
 
 import { useAuth } from '../../providers/AuthProvider'
 import { useInstagramIntegrationStatus } from '../../hooks/api/integrations'
+import { CreatorSearch } from '../navigation/CreatorSearch'
 import logoImage from '../../assets/logo.png'
 
 const navItems = [
   { label: 'Dashboard', to: '/' },
+  { label: 'Explore', to: '/explore' },
   { label: 'Projects', to: '/projects' },
   { label: 'Analytics', to: '/analytics' },
   { label: 'Profile', to: '/profile' },
@@ -111,11 +113,8 @@ export function RootLayout() {
 
         <div className="flex h-screen flex-col overflow-y-auto">
           <header className="border-b border-slate-900/80 bg-slate-950/60 backdrop-blur">
-            <div className="flex items-center justify-between px-6 py-5">
-              <div className="flex items-center gap-3 text-sm text-slate-400">
-                <span className={badgeClasses}>Creator workspace</span>
-                <span className="hidden sm:inline">Monitor reach, engagement, and collaborations</span>
-              </div>
+            <div className="flex items-center justify-between gap-4 px-6 py-5">
+              <CreatorSearch />
               <div className="flex items-center gap-4">
                 <div className="hidden flex-col text-right text-xs text-slate-500 sm:flex">
                   <span className="text-sm font-medium text-slate-200">{user?.name ?? 'Credify Creator'}</span>
