@@ -29,7 +29,24 @@ function getEnv(): EnvShape {
 
 export const env = getEnv()
 
-export const apiBaseUrl =
-  env.VITE_API_URL?.replace(/\/$/, '') ||
-  (import.meta.env.DEV ? 'http://localhost:3000' : `${window.location.origin.replace(/\/$/, '')}`)
+// In development, prefer localhost unless explicitly set
+// In production, require VITE_API_URL to be set
+export const apiBaseUrl = (() => {
+  if (import.meta.env.DEV) {
+    // Development: use localhost:3000 unless VITE_API_URL is explicitly set
+    return env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:3000'
+  } else {
+    // Production: use VITE_API_URL if set, otherwise same origin
+    return env.VITE_API_URL?.replace(/\/$/, '') || window.location.origin.replace(/\/$/, '')
+  }
+})()
+
+// Log API base URL in development for debugging
+if (import.meta.env.DEV) {
+  console.log('[env] API base URL configured:', apiBaseUrl, {
+    hasViteApiUrl: !!env.VITE_API_URL,
+    viteApiUrl: env.VITE_API_URL,
+    isDev: import.meta.env.DEV,
+  })
+}
 

@@ -48,6 +48,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     let isMounted = true
 
+    const fetchUserProfile = async (accessToken: string): Promise<string | null> => {
+      try {
+        const response = await apiRequest<{ user: { id: string; email: string; name: string | null } }>(
+          '/api/users/me',
+          {
+            accessToken,
+          },
+        )
+        return response.user.name
+      } catch (error) {
+        console.warn('[AuthProvider] Failed to fetch user profile:', error)
+        return null
+      }
+    }
+
     const restoreSupabaseSession = async () => {
       try {
         const { data, error } = await supabaseClient.auth.getSession()
@@ -64,13 +79,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
           const supabaseSession = data.session
           const supabaseUser = supabaseSession.user
 
+          // Provision user record in public.users first
+          try {
+            await apiRequest<{ user: { id: string; email: string; name: string | null } }>(
+              '/api/auth/provision',
+              {
+                method: 'POST',
+                accessToken: supabaseSession.access_token,
+              },
+            )
+          } catch (error) {
+            // Log but don't block authentication if provisioning fails
+            console.warn('[AuthProvider] Failed to provision user record:', error)
+          }
+
+          // Fetch display name from users table
+          const displayName = await fetchUserProfile(supabaseSession.access_token)
+          const fallbackName =
+            (supabaseUser.user_metadata?.full_name as string | undefined) ??
+            (supabaseUser.user_metadata?.name as string | undefined) ??
+            supabaseUser.email ??
+            null
+
+          if (!isMounted) {
+            return
+          }
+
           setUser({
             id: supabaseUser.id,
             email: supabaseUser.email ?? '',
-            name:
-              (supabaseUser.user_metadata?.full_name as string | undefined) ??
-              (supabaseUser.user_metadata?.name as string | undefined) ??
-              supabaseUser.email,
+            name: displayName ?? fallbackName,
             isDemo: false,
           })
 
@@ -88,20 +126,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
           clearDemoStorage()
           setStatus('authenticated')
-
-          // Provision user record in public.users
-          try {
-            await apiRequest<{ user: { id: string; email: string; name: string | null } }>(
-              '/api/auth/provision',
-              {
-                method: 'POST',
-                accessToken: supabaseSession.access_token,
-              },
-            )
-          } catch (error) {
-            // Log but don't block authentication if provisioning fails
-            console.warn('[AuthProvider] Failed to provision user record:', error)
-          }
 
           return
         }
@@ -146,13 +170,40 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       if (supabaseSession?.user) {
+        // Provision user record in public.users after sign-in
+        // This is idempotent, so safe to call on every auth state change
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          try {
+            await apiRequest<{ user: { id: string; email: string; name: string | null } }>(
+              '/api/auth/provision',
+              {
+                method: 'POST',
+                accessToken: supabaseSession.access_token,
+              },
+            )
+          } catch (error) {
+            // Log but don't block authentication if provisioning fails
+            // The user can still use the app, and provisioning can be retried
+            console.warn('[AuthProvider] Failed to provision user record:', error)
+          }
+        }
+
+        // Fetch display name from users table
+        const displayName = await fetchUserProfile(supabaseSession.access_token)
+        const fallbackName =
+          (supabaseSession.user.user_metadata?.full_name as string | undefined) ??
+          (supabaseSession.user.user_metadata?.name as string | undefined) ??
+          supabaseSession.user.email ??
+          null
+
+        if (!isMounted) {
+          return
+        }
+
         setUser({
           id: supabaseSession.user.id,
           email: supabaseSession.user.email ?? '',
-          name:
-            (supabaseSession.user.user_metadata?.full_name as string | undefined) ??
-            (supabaseSession.user.user_metadata?.name as string | undefined) ??
-            supabaseSession.user.email,
+          name: displayName ?? fallbackName,
           isDemo: false,
         })
 
@@ -172,24 +223,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         clearDemoStorage()
         setStatus('authenticated')
-
-        // Provision user record in public.users after sign-in
-        // This is idempotent, so safe to call on every auth state change
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          try {
-            await apiRequest<{ user: { id: string; email: string; name: string | null } }>(
-              '/api/auth/provision',
-              {
-                method: 'POST',
-                accessToken: supabaseSession.access_token,
-              },
-            )
-          } catch (error) {
-            // Log but don't block authentication if provisioning fails
-            // The user can still use the app, and provisioning can be retried
-            console.warn('[AuthProvider] Failed to provision user record:', error)
-          }
-        }
       } else {
         clearDemoStorage()
         setUser(null)
@@ -203,6 +236,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => {
       isMounted = false
       subscription.subscription.unsubscribe()
+    }
+  }, [])
+
+  // Listen for display name updates from other parts of the app
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const handleDisplayNameUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<{ name: string | null }>
+      setUser((prev) => {
+        if (prev && !prev.isDemo) {
+          return { ...prev, name: customEvent.detail.name }
+        }
+        return prev
+      })
+    }
+
+    window.addEventListener('displayNameUpdated', handleDisplayNameUpdate)
+
+    return () => {
+      window.removeEventListener('displayNameUpdated', handleDisplayNameUpdate)
     }
   }, [])
 

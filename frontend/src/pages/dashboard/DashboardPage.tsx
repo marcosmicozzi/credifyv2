@@ -36,7 +36,7 @@ const getErrorMessage = (error: unknown) => {
 }
 
 export function DashboardPage() {
-  const { session } = useAuth()
+  const { session, user } = useAuth()
   const isDemo = session?.type === 'demo'
 
   const [editingProject, setEditingProject] = useState<Project | null>(null)
@@ -192,10 +192,14 @@ export function DashboardPage() {
 
   const metricsStateMessage = metricsErrored ? getErrorMessage(metricsError) : null
 
+  const displayName = user?.name ?? user?.email ?? 'Creator'
+
   return (
     <>
       <section className="flex flex-col gap-4">
-        <h1 className="text-3xl font-semibold tracking-tight text-white">Creator Command Center</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-white">
+          {displayName} Dashboard
+        </h1>
         <p className="max-w-3xl text-sm text-slate-400">
           Track creator growth, campaign performance, and cross-platform health in real-time.
         </p>

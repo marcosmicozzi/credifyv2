@@ -159,3 +159,69 @@ export function useUnfollowUser() {
   })
 }
 
+type UpdateDisplayNameResponse = {
+  user: {
+    id: string
+    email: string
+    name: string | null
+  }
+}
+
+export function useUpdateDisplayName() {
+  const queryClient = useQueryClient()
+  const { status: authStatus, session } = useAuth()
+  const accessToken = session?.accessToken ?? null
+
+  return useMutation({
+    mutationFn: async (name: string | null) => {
+      if (authStatus !== 'authenticated' || !accessToken) {
+        throw new ApiError(401, 'Authentication required to update display name.', null)
+      }
+
+      try {
+        console.log('[useUpdateDisplayName] Making request to update display name:', {
+          name,
+          accessToken: accessToken ? 'present' : 'missing',
+          path: '/api/users/me',
+        })
+        
+        const response = await apiRequest<UpdateDisplayNameResponse>('/api/users/me', {
+          method: 'PATCH',
+          accessToken,
+          body: JSON.stringify({ name }),
+        })
+
+        console.log('[useUpdateDisplayName] Request successful:', response)
+        return response.user
+      } catch (error) {
+        // Re-throw with more context for debugging
+        if (error instanceof ApiError) {
+          throw error
+        }
+        // Handle network errors (Failed to fetch)
+        if (error instanceof TypeError && error.message === 'Failed to fetch') {
+          throw new ApiError(
+            0,
+            'Network error: Unable to reach the server. Please check if the backend is running and accessible.',
+            null,
+          )
+        }
+        throw error
+      }
+    },
+    onSuccess: async (updatedUser) => {
+      // Invalidate all user-related queries to refresh the UI
+      await queryClient.invalidateQueries({ queryKey: usersQueryKey })
+
+      // Notify AuthProvider to update the user's display name immediately
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('displayNameUpdated', {
+            detail: { name: updatedUser.name },
+          }),
+        )
+      }
+    },
+  })
+}
+

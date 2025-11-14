@@ -9,6 +9,127 @@ const usersRouter = Router()
 
 usersRouter.use(authenticate)
 
+// Test endpoint to verify route registration
+usersRouter.get('/me/test', (_req, res) => {
+  console.log('[GET /api/users/me/test] Test endpoint hit')
+  res.json({ message: 'Route registration test - /me routes are accessible' })
+})
+
+// Get current user's profile (must be before /:userId route)
+usersRouter.get('/me', async (req, res, next) => {
+  try {
+    if (!req.auth) {
+      res.status(500).json({
+        error: 'AuthContextMissing',
+        message: 'Authentication context is not available on the request.',
+      })
+      return
+    }
+
+    const supabase = createSupabaseUserClient(req.auth.token)
+
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('u_id, u_email, u_name, u_created_at')
+      .eq('u_id', req.auth.userId)
+      .maybeSingle()
+
+    if (userError || !userData) {
+      res.status(404).json({
+        error: 'UserNotFound',
+        message: 'User not found.',
+      })
+      return
+    }
+
+    res.json({
+      user: {
+        id: userData.u_id,
+        email: userData.u_email,
+        name: userData.u_name,
+      },
+    })
+  } catch (error) {
+    next(error)
+  }
+})
+
+// Update current user's display name (must be before /:userId route)
+usersRouter.patch('/me', async (req, res, next) => {
+  // Log immediately when route is hit
+  console.log('='.repeat(50))
+  console.log('[PATCH /api/users/me] Route handler called')
+  console.log('Request method:', req.method)
+  console.log('Request path:', req.path)
+  console.log('Request URL:', req.url)
+  console.log('Request body:', req.body)
+  console.log('Has auth:', !!req.auth)
+  console.log('='.repeat(50))
+  
+  try {
+
+    if (!req.auth) {
+      res.status(500).json({
+        error: 'AuthContextMissing',
+        message: 'Authentication context is not available on the request.',
+      })
+      return
+    }
+
+    const bodySchema = z.object({
+      name: z.union([z.string().min(1).max(100), z.null()]),
+    })
+
+    const { name } = bodySchema.parse(req.body)
+    console.log('[PATCH /api/users/me] Parsed name:', name)
+
+    if (!supabaseAdmin) {
+      const error = new Error('Supabase admin client is not configured.')
+      error.name = 'ConfigurationError'
+      ;(error as { status?: number }).status = 500
+      throw error
+    }
+
+    const { data: updatedUser, error: updateError } = await supabaseAdmin
+      .from('users')
+      .update({
+        u_name: name,
+      })
+      .eq('u_id', req.auth.userId)
+      .select('u_id, u_email, u_name, u_created_at')
+      .single()
+
+    if (updateError) {
+      console.error('[PATCH /api/users/me] Supabase update error:', updateError)
+      const wrapped = new Error(`Failed to update display name: ${updateError.message}`)
+      wrapped.name = 'SupabaseMutationError'
+      ;(wrapped as { cause?: unknown }).cause = updateError
+      throw wrapped
+    }
+
+    console.log('[PATCH /api/users/me] Successfully updated user:', updatedUser.u_id, 'name:', updatedUser.u_name)
+
+    res.json({
+      user: {
+        id: updatedUser.u_id,
+        email: updatedUser.u_email,
+        name: updatedUser.u_name,
+      },
+    })
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        error: 'ValidationError',
+        message: 'Invalid display name.',
+        details: error.flatten(),
+      })
+      return
+    }
+
+    next(error)
+  }
+})
+
 // Search users
 usersRouter.get('/search', async (req, res, next) => {
   try {

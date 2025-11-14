@@ -43,10 +43,35 @@ export async function apiRequest<TResponse>(path: string, options: ApiRequestOpt
     headers.set('Content-Type', 'application/json')
   }
 
-  const response = await fetch(buildUrl(path), {
-    ...init,
-    headers,
-  })
+  const url = buildUrl(path)
+  
+  // Log request details in development for debugging
+  if (import.meta.env.DEV) {
+    console.log('[apiRequest]', init.method || 'GET', url, {
+      hasBody: !!init.body,
+      hasToken: !!accessToken,
+      body: init.body,
+      headers: Object.fromEntries(headers.entries()),
+    })
+  }
+
+  let response: Response
+  try {
+    response = await fetch(url, {
+      ...init,
+      headers,
+    })
+  } catch (fetchError) {
+    // Log fetch errors for debugging
+    if (import.meta.env.DEV) {
+      console.error('[apiRequest] Fetch error:', fetchError, {
+        url,
+        method: init.method,
+        hasBody: !!init.body,
+      })
+    }
+    throw fetchError
+  }
 
   const contentType = response.headers.get('content-type')
 
