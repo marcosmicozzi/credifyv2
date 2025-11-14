@@ -16,13 +16,6 @@ const percentFormatter = new Intl.NumberFormat('en-US', {
   signDisplay: 'auto',
 })
 
-const checklist = [
-  'Connect Supabase credentials',
-  'Enable Instagram OAuth redirect',
-  'Configure YouTube ingestion webhook',
-  'Schedule nightly metrics refresh',
-]
-
 const formatNumber = (value: number) => compactNumber.format(value)
 
 const getErrorMessage = (error: unknown) => {
@@ -297,15 +290,37 @@ export function DashboardPage() {
         </article>
 
         <aside className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-8">
-          <h2 className="text-lg font-semibold tracking-tight text-white">Launch Checklist</h2>
-          <ul className="mt-6 space-y-3 text-sm text-slate-400">
-            {checklist.map((item) => (
-              <li key={item} className="flex items-start gap-2">
-                <span className="mt-1 h-2.5 w-2.5 rounded-full bg-slate-500/70" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10">
+                <svg
+                  className="h-6 w-6 text-emerald-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
+                  />
+                </svg>
+              </div>
+            </div>
+            <div className="flex-1 text-left">
+              <h2 className="text-lg font-semibold tracking-tight text-white">Claim Your Industry Badge</h2>
+              <p className="mt-2 text-sm text-slate-400">
+                Showcase your credibility and get recognized for your work in the creator economy.
+              </p>
+              <button
+                type="button"
+                className="mt-6 w-full inline-flex items-center justify-center rounded-lg bg-emerald-500/20 px-6 py-3 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/30"
+              >
+                Claim badge
+              </button>
+            </div>
+          </div>
         </aside>
       </section>
 

@@ -3,6 +3,7 @@ import { useMemo, useState, useEffect } from 'react'
 
 import { useAuth } from '../../providers/AuthProvider'
 import { useInstagramIntegrationStatus } from '../../hooks/api/integrations'
+import logoImage from '../../assets/logo.png'
 
 const navItems = [
   { label: 'Dashboard', to: '/' },
@@ -39,6 +40,7 @@ export function RootLayout() {
   const profilePictureUrl = instagramStatus.data?.profilePictureUrl ?? null
   const hasInstagramProfile = instagramStatus.data?.connected && profilePictureUrl
   const [imageError, setImageError] = useState(false)
+  const [logoError, setLogoError] = useState(false)
 
   // Reset image error when profile picture URL changes
   useEffect(() => {
@@ -49,9 +51,20 @@ export function RootLayout() {
     <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-930 to-slate-900 text-slate-100">
       <div className="grid h-screen lg:grid-cols-[18rem_1fr]">
         <aside className="hidden h-screen border-r border-slate-900/80 bg-slate-950/90 lg:flex lg:flex-col lg:overflow-y-auto">
-          <div className="flex items-center justify-between px-6 pt-6 pb-6">
-            <span className="text-lg font-semibold tracking-tight text-slate-100">CredifyV2</span>
-            <span className={badgeClasses}>{user?.isDemo ? 'demo' : 'beta'}</span>
+          <div className="flex items-center justify-center px-6 pt-6 pb-6">
+            {!logoError ? (
+              <img
+                src={logoImage}
+                alt="Credify"
+                className="h-20 w-auto max-w-[360px] object-contain"
+                onError={(e) => {
+                  console.error('Logo failed to load:', e)
+                  setLogoError(true)
+                }}
+              />
+            ) : (
+              <span className="text-lg font-semibold tracking-tight text-slate-100">Credify</span>
+            )}
           </div>
           <div className="flex justify-center px-6 pb-5">
             <div className="relative h-32 w-32 overflow-hidden rounded-full border-2 border-slate-800 bg-slate-900 shadow-lg">
