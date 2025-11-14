@@ -9,6 +9,7 @@ import { DashboardPage } from './pages/dashboard/DashboardPage'
 import { ProfilePage } from './pages/profile/ProfilePage'
 import { ProjectsPage } from './pages/projects/ProjectsPage'
 import { SettingsPage } from './pages/settings/SettingsPage'
+import { TutorialPage } from './pages/tutorial/TutorialPage'
 import { AppProviders } from './providers/AppProviders'
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/tutorial" element={<TutorialPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Route>

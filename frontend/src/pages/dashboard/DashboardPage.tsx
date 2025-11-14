@@ -7,6 +7,7 @@ import { useAuth } from '../../providers/AuthProvider'
 import { DeleteProjectConfirmation } from './DeleteProjectConfirmation'
 import { EditProjectModal } from './EditProjectModal'
 import { ProjectKebabMenu } from './ProjectKebabMenu'
+import { BadgeClaimModal } from '../../components/badge/BadgeClaimModal'
 
 const compactNumber = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 })
 const wholeNumber = new Intl.NumberFormat('en-US')
@@ -40,6 +41,7 @@ export function DashboardPage() {
 
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [deletingProject, setDeletingProject] = useState<Project | null>(null)
+  const [isBadgeModalOpen, setIsBadgeModalOpen] = useState(false)
 
   const {
     data: projects,
@@ -315,6 +317,7 @@ export function DashboardPage() {
               </p>
               <button
                 type="button"
+                onClick={() => setIsBadgeModalOpen(true)}
                 className="mt-6 w-full inline-flex items-center justify-center rounded-lg bg-emerald-500/20 px-6 py-3 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/30"
               >
                 Claim badge
@@ -602,6 +605,8 @@ export function DashboardPage() {
           void refetchProjects()
         }}
       />
+
+      <BadgeClaimModal isOpen={isBadgeModalOpen} onClose={() => setIsBadgeModalOpen(false)} />
     </>
   )
 }

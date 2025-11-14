@@ -11,6 +11,7 @@ const navItems = [
   { label: 'Analytics', to: '/analytics' },
   { label: 'Profile', to: '/profile' },
   { label: 'Settings', to: '/settings' },
+  { label: 'Tutorial', to: '/tutorial' },
 ]
 
 const badgeClasses =
