@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, type PieLabelRenderProps } from 'recharts'
 
 import { useRoleImpact, type RoleImpactParams } from '../../hooks/api/metrics'
 
@@ -70,7 +70,19 @@ export function ImpactByRole({ platform }: ImpactByRoleProps) {
     ]
   }, [data])
 
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; payload: { label: string; percentage: number } }> }) => {
+  type ChartDataPoint = {
+    label: string
+    value: number
+    percentage: number
+  }
+
+  const CustomTooltip = ({
+    active,
+    payload,
+  }: {
+    active?: boolean
+    payload?: Array<{ name: string; value: number; payload: ChartDataPoint }>
+  }) => {
     if (!active || !payload || payload.length === 0) {
       return null
     }
@@ -89,11 +101,13 @@ export function ImpactByRole({ platform }: ImpactByRoleProps) {
     )
   }
 
-  const renderLabel = (entry: { label: string; percentage: number }) => {
-    if (entry.percentage < 3) {
+  const renderLabel = (props: PieLabelRenderProps) => {
+    const payload = props.payload as ChartDataPoint | undefined
+    const percentage = payload?.percentage ?? (props.percent ? props.percent * 100 : 0)
+    if (percentage < 3) {
       return '' // Don't show labels for very small slices
     }
-    return `${entry.percentage.toFixed(0)}%`
+    return `${percentage.toFixed(0)}%`
   }
 
   if (isLoading) {
@@ -241,7 +255,7 @@ export function ImpactByRole({ platform }: ImpactByRoleProps) {
                 fill="#8884d8"
                 dataKey="value"
               >
-                {chartData.map((entry, index) => (
+                {chartData.map((_entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>

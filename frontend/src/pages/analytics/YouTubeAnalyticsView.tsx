@@ -3,7 +3,6 @@ import { useMemo, useState } from 'react'
 import { usePlatformMetrics, useMetricsSummary, useInstagramAccountInsights } from '../../hooks/api/metrics'
 
 const numberFormatter = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 })
-const percentFormatter = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 2 })
 
 type RangeOptionId = '12M' | '1M' | '7D'
 
@@ -72,15 +71,6 @@ function buildSparklinePath(values: Array<number>, { width, height }: typeof def
     const command = index === 0 ? 'M' : 'L'
     return `${path}${command}${point.x} ${point.y} `
   }, '').trim()
-}
-
-const formatPercentValue = (value: number | null | undefined) => {
-  if (value === null || value === undefined) {
-    return '—'
-  }
-
-  const normalized = value > 1 ? value / 100 : value
-  return percentFormatter.format(normalized)
 }
 
 type YouTubeAnalyticsViewProps = {
