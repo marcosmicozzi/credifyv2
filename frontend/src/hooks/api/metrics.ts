@@ -213,4 +213,74 @@ export function useInstagramAccountInsights({ metric, limit, enabled }: Instagra
   })
 }
 
+export type RoleImpactDataPoint = {
+  label: string
+  value: number
+  percentage: number
+}
+
+export type RoleImpactResponse = {
+  groupBy: 'role' | 'category'
+  metric: 'views' | 'likes' | 'comments' | 'projects'
+  platform: 'all' | 'youtube' | 'instagram'
+  dateRange: '7d' | '28d' | '90d' | 'all' | 'custom'
+  mode: 'full' | 'share_weighted'
+  data: RoleImpactDataPoint[]
+  total: number
+}
+
+export type RoleImpactParams = {
+  groupBy?: 'role' | 'category'
+  metric?: 'views' | 'likes' | 'comments' | 'projects'
+  platform?: 'all' | 'youtube' | 'instagram'
+  dateRange?: '7d' | '28d' | '90d' | 'all' | 'custom'
+  startDate?: string
+  endDate?: string
+  mode?: 'full' | 'share_weighted'
+}
+
+export function useRoleImpact(params: RoleImpactParams) {
+  const { status: authStatus, session } = useAuth()
+  const accessToken = session?.accessToken ?? null
+
+  return useQuery({
+    queryKey: ['metrics', 'role-impact', params],
+    enabled: authStatus === 'authenticated' && Boolean(accessToken),
+    queryFn: async () => {
+      const query = new URLSearchParams()
+      if (params.groupBy) {
+        query.set('groupBy', params.groupBy)
+      }
+      if (params.metric) {
+        query.set('metric', params.metric)
+      }
+      if (params.platform) {
+        query.set('platform', params.platform)
+      }
+      if (params.dateRange) {
+        query.set('dateRange', params.dateRange)
+      }
+      if (params.startDate) {
+        query.set('startDate', params.startDate)
+      }
+      if (params.endDate) {
+        query.set('endDate', params.endDate)
+      }
+      if (params.mode) {
+        query.set('mode', params.mode)
+      }
+
+      const response = await apiRequest<RoleImpactResponse>(
+        `/api/metrics/role-impact${query.toString() ? `?${query.toString()}` : ''}`,
+        {
+          accessToken,
+        },
+      )
+
+      return response
+    },
+    staleTime: 60_000,
+  })
+}
+
 

@@ -1147,6 +1147,386 @@ metricsRouter.get('/platform/:platform/account-insights', async (req, res, next)
   }
 })
 
+const roleImpactQuerySchema = z.object({
+  groupBy: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((value) => {
+      if (Array.isArray(value)) {
+        return value[0]
+      }
+      return value
+    })
+    .pipe(z.enum(['role', 'category']).optional())
+    .default('role'),
+  metric: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((value) => {
+      if (Array.isArray(value)) {
+        return value[0]
+      }
+      return value
+    })
+    .pipe(z.enum(['views', 'likes', 'comments', 'projects']).optional())
+    .default('views'),
+  platform: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((value) => {
+      if (Array.isArray(value)) {
+        return value[0]
+      }
+      return value
+    })
+    .pipe(z.enum(['all', 'youtube', 'instagram']).optional())
+    .default('all'),
+  dateRange: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((value) => {
+      if (Array.isArray(value)) {
+        return value[0]
+      }
+      return value
+    })
+    .pipe(z.enum(['7d', '28d', '90d', 'all', 'custom']).optional())
+    .default('all'),
+  startDate: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((value) => {
+      if (Array.isArray(value)) {
+        return value[0]
+      }
+      return value
+    }),
+  endDate: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((value) => {
+      if (Array.isArray(value)) {
+        return value[0]
+      }
+      return value
+    }),
+  mode: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((value) => {
+      if (Array.isArray(value)) {
+        return value[0]
+      }
+      return value
+    })
+    .pipe(z.enum(['full', 'share_weighted']).optional())
+    .default('full'),
+})
+
+type RoleImpactDataPoint = {
+  label: string
+  value: number
+  percentage: number
+}
+
+async function loadRoleImpact(
+  supabase: ReturnType<typeof createSupabaseUserClient>,
+  userId: string,
+  params: z.infer<typeof roleImpactQuerySchema>,
+): Promise<{ data: RoleImpactDataPoint[]; total: number }> {
+  // Get user_projects with roles
+  let query = supabase
+    .from('user_projects')
+    .select(
+      `
+      p_id,
+      role_id,
+      u_role,
+      roles:role_id (
+        role_name,
+        category
+      )
+    `,
+    )
+    .eq('u_id', userId)
+
+  const { data: userProjects, error: userProjectsError } = await query
+
+  if (userProjectsError) {
+    const wrapped = new Error(`Failed to load user projects: ${userProjectsError.message}`)
+    wrapped.name = 'SupabaseQueryError'
+    ;(wrapped as { cause?: unknown }).cause = userProjectsError
+    throw wrapped
+  }
+
+  if (!userProjects || userProjects.length === 0) {
+    return { data: [], total: 0 }
+  }
+
+  // Get project IDs and filter by platform if needed
+  const projectIds = userProjects.map((up) => up.p_id as string)
+
+  let platformProjectIds = projectIds
+  if (params.platform !== 'all') {
+    const { data: platformProjects, error: platformError } = await supabase
+      .from('projects')
+      .select('p_id')
+      .in('p_id', projectIds)
+      .eq('p_platform', params.platform)
+
+    if (platformError) {
+      const wrapped = new Error(`Failed to filter projects by platform: ${platformError.message}`)
+      wrapped.name = 'SupabaseQueryError'
+      ;(wrapped as { cause?: unknown }).cause = platformError
+      throw wrapped
+    }
+
+    platformProjectIds = platformProjects?.map((p) => p.p_id) ?? []
+  }
+
+  if (platformProjectIds.length === 0) {
+    return { data: [], total: 0 }
+  }
+
+  // Calculate date range filter (based on project posted date)
+  let dateFilter: { start?: string; end?: string } = {}
+  if (params.dateRange === 'custom' && params.startDate && params.endDate) {
+    dateFilter.start = params.startDate
+    dateFilter.end = params.endDate
+  } else if (params.dateRange !== 'all') {
+    const days = params.dateRange === '7d' ? 7 : params.dateRange === '28d' ? 28 : 90
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    dateFilter.start = startDate.toISOString()
+    dateFilter.end = endDate.toISOString()
+  }
+
+  // Filter projects by posted date if date range is specified
+  if (dateFilter.start || dateFilter.end) {
+    let projectsQuery = supabase
+      .from('projects')
+      .select('p_id')
+      .in('p_id', platformProjectIds)
+
+    if (dateFilter.start) {
+      projectsQuery = projectsQuery.gte('p_posted_at', dateFilter.start)
+    }
+    if (dateFilter.end) {
+      projectsQuery = projectsQuery.lte('p_posted_at', dateFilter.end)
+    }
+
+    const { data: filteredProjects, error: filteredError } = await projectsQuery
+
+    if (filteredError) {
+      const wrapped = new Error(`Failed to filter projects by date: ${filteredError.message}`)
+      wrapped.name = 'SupabaseQueryError'
+      ;(wrapped as { cause?: unknown }).cause = filteredError
+      throw wrapped
+    }
+
+    platformProjectIds = filteredProjects?.map((p) => p.p_id) ?? []
+  }
+
+  // Load metrics based on platform
+  const roleMetricMap = new Map<string, number>()
+  const projectCountMap = new Map<string, number>()
+
+  // Handle "projects" metric separately - just count projects per role/category
+  if (params.metric === 'projects') {
+    for (const up of userProjects) {
+      if (!platformProjectIds.includes(up.p_id as string)) {
+        continue
+      }
+
+      // Handle both predefined roles and custom roles
+      let groupKey: string
+      if (up.u_role) {
+        // Custom role
+        if (params.groupBy === 'category') {
+          groupKey = 'Custom' // Custom roles go into "Custom" category
+        } else {
+          groupKey = up.u_role as string
+        }
+      } else {
+        const role = up.roles as { role_name: string; category: string | null } | null
+        if (!role) {
+          continue // Skip if no role assigned
+        }
+        groupKey = params.groupBy === 'category' ? (role.category ?? 'Unknown') : role.role_name
+      }
+      projectCountMap.set(groupKey, (projectCountMap.get(groupKey) ?? 0) + 1)
+    }
+
+    const total = Array.from(projectCountMap.values()).reduce((sum, val) => sum + val, 0)
+    const data: RoleImpactDataPoint[] = Array.from(projectCountMap.entries()).map(([label, value]) => ({
+      label,
+      value,
+      percentage: total > 0 ? (value / total) * 100 : 0,
+    }))
+
+    return { data, total }
+  }
+
+  // For other metrics, load from metrics tables
+  if (params.platform === 'all' || params.platform === 'youtube') {
+    const youtubeQuery = supabase
+      .from('youtube_latest_metrics')
+      .select('p_id, view_count, like_count, comment_count')
+      .in('p_id', platformProjectIds)
+
+    const { data: youtubeMetrics, error: youtubeError } = await youtubeQuery
+
+    if (youtubeError) {
+      const wrapped = new Error(`Failed to load YouTube metrics: ${youtubeError.message}`)
+      wrapped.name = 'SupabaseQueryError'
+      ;(wrapped as { cause?: unknown }).cause = youtubeError
+      throw wrapped
+    }
+
+    if (youtubeMetrics) {
+      for (const metric of youtubeMetrics) {
+        const up = userProjects.find((u) => u.p_id === metric.p_id)
+        if (!up) continue
+
+        // Handle both predefined roles and custom roles
+        let groupKey: string
+        if (up.u_role) {
+          // Custom role
+          if (params.groupBy === 'category') {
+            groupKey = 'Custom' // Custom roles go into "Custom" category
+          } else {
+            groupKey = up.u_role as string
+          }
+        } else {
+          const role = up.roles as { role_name: string; category: string | null } | null
+          if (!role) continue // Skip if no role assigned
+          groupKey = params.groupBy === 'category' ? (role.category ?? 'Unknown') : role.role_name
+        }
+
+        let metricValue = 0
+        switch (params.metric) {
+          case 'views':
+            metricValue = (metric.view_count as number) ?? 0
+            break
+          case 'likes':
+            metricValue = (metric.like_count as number) ?? 0
+            break
+          case 'comments':
+            metricValue = (metric.comment_count as number) ?? 0
+            break
+          default:
+            metricValue = (metric.view_count as number) ?? 0
+        }
+
+        roleMetricMap.set(groupKey, (roleMetricMap.get(groupKey) ?? 0) + metricValue)
+      }
+    }
+  }
+
+  if (params.platform === 'all' || params.platform === 'instagram') {
+    const instagramQuery = supabase
+      .from('instagram_latest_metrics')
+      .select('p_id, view_count, like_count, comment_count')
+      .in('p_id', platformProjectIds)
+
+    const { data: instagramMetrics, error: instagramError } = await instagramQuery
+
+    if (instagramError) {
+      const wrapped = new Error(`Failed to load Instagram metrics: ${instagramError.message}`)
+      wrapped.name = 'SupabaseQueryError'
+      ;(wrapped as { cause?: unknown }).cause = instagramError
+      throw wrapped
+    }
+
+    if (instagramMetrics) {
+      for (const metric of instagramMetrics) {
+        const up = userProjects.find((u) => u.p_id === metric.p_id)
+        if (!up) continue
+
+        // Handle both predefined roles and custom roles
+        let groupKey: string
+        if (up.u_role) {
+          // Custom role
+          if (params.groupBy === 'category') {
+            groupKey = 'Custom' // Custom roles go into "Custom" category
+          } else {
+            groupKey = up.u_role as string
+          }
+        } else {
+          const role = up.roles as { role_name: string; category: string | null } | null
+          if (!role) continue // Skip if no role assigned
+          groupKey = params.groupBy === 'category' ? (role.category ?? 'Unknown') : role.role_name
+        }
+
+        let metricValue = 0
+        switch (params.metric) {
+          case 'views':
+            metricValue = (metric.view_count as number) ?? 0
+            break
+          case 'likes':
+            metricValue = (metric.like_count as number) ?? 0
+            break
+          case 'comments':
+            metricValue = (metric.comment_count as number) ?? 0
+            break
+          default:
+            metricValue = (metric.view_count as number) ?? 0
+        }
+
+        roleMetricMap.set(groupKey, (roleMetricMap.get(groupKey) ?? 0) + metricValue)
+      }
+    }
+  }
+
+  const total = Array.from(roleMetricMap.values()).reduce((sum, val) => sum + val, 0)
+  const data: RoleImpactDataPoint[] = Array.from(roleMetricMap.entries()).map(([label, value]) => ({
+    label,
+    value,
+    percentage: total > 0 ? (value / total) * 100 : 0,
+  }))
+
+  return { data, total }
+}
+
+metricsRouter.get('/role-impact', async (req, res, next) => {
+  try {
+    if (!req.auth) {
+      res.status(500).json({
+        error: 'AuthContextMissing',
+        message: 'Authentication context is not available on the request.',
+      })
+      return
+    }
+
+    const query = roleImpactQuerySchema.parse(req.query)
+    const supabase = createSupabaseUserClient(req.auth.token)
+
+    const result = await loadRoleImpact(supabase, req.auth.userId, query)
+
+    res.json({
+      groupBy: query.groupBy,
+      metric: query.metric,
+      platform: query.platform,
+      dateRange: query.dateRange,
+      mode: query.mode,
+      data: result.data,
+      total: result.total,
+    })
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        error: 'ValidationError',
+        message: 'Invalid request parameters.',
+        details: error.flatten(),
+      })
+      return
+    }
+
+    next(error)
+  }
+})
+
 export { metricsRouter }
 
 

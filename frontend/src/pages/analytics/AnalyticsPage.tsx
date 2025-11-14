@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 
 import { useProjects } from '../../hooks/api/projects'
 import { ClaimYouTubeModal } from './ClaimYouTubeModal'
+import { ImpactByRole } from './ImpactByRole'
 import { YouTubeAnalyticsView } from './YouTubeAnalyticsView'
 
 type Platform = 'youtube' | 'instagram'
@@ -142,13 +143,16 @@ export function AnalyticsPage() {
           )}
 
           {hasYouTubeProjects && (
-            <YouTubeAnalyticsView
-              platform="youtube"
-              isLoading={isLoading}
-              hasErrors={hasErrors}
-              errorMessage={errorMessage}
-              projectCount={youtubeProjects.length}
-            />
+            <>
+              <YouTubeAnalyticsView
+                platform="youtube"
+                isLoading={isLoading}
+                hasErrors={hasErrors}
+                errorMessage={errorMessage}
+                projectCount={youtubeProjects.length}
+              />
+              <ImpactByRole platform="youtube" />
+            </>
           )}
         </>
       )}
@@ -184,13 +188,16 @@ export function AnalyticsPage() {
           )}
 
           {hasInstagramProjects && (
-            <YouTubeAnalyticsView
-              platform="instagram"
-              isLoading={isLoading}
-              hasErrors={hasErrors}
-              errorMessage={errorMessage}
-              projectCount={instagramProjects.length}
-            />
+            <>
+              <YouTubeAnalyticsView
+                platform="instagram"
+                isLoading={isLoading}
+                hasErrors={hasErrors}
+                errorMessage={errorMessage}
+                projectCount={instagramProjects.length}
+              />
+              <ImpactByRole platform="instagram" />
+            </>
           )}
         </>
       )}
