@@ -91,6 +91,7 @@ export type InstagramIntegrationStatus = {
   connected: boolean
   accountId: string | null
   accountUsername: string | null
+  profilePictureUrl: string | null
   expiresAt: string | null
   updatedAt: string | null
 }

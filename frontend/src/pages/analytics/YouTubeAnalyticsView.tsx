@@ -410,35 +410,6 @@ export function YouTubeAnalyticsView({ platform, isLoading, hasErrors, errorMess
 
   return (
     <>
-      <div className="flex flex-col items-start gap-3 text-xs uppercase tracking-[0.25em] text-slate-500 md:items-end md:text-right">
-        <div className="flex flex-wrap gap-4">
-          {summarySource?.updatedAt && (
-            <span>Updated {new Date(summarySource.updatedAt).toLocaleDateString()}</span>
-          )}
-          <span>{platform.toUpperCase()}</span>
-        </div>
-        <div className="flex gap-2 text-[0.7rem] tracking-[0.35em]">
-          {RANGE_OPTIONS.map((option) => {
-            const isActive = option.id === selectedRange.id
-            return (
-              <button
-                key={option.id}
-                type="button"
-                aria-pressed={isActive}
-                onClick={() => setSelectedRange(option)}
-                className={`rounded-full border px-3 py-1 transition ${
-                  isActive
-                    ? 'border-emerald-500/70 bg-emerald-500/20 text-emerald-100'
-                    : 'border-slate-700/60 text-slate-400 hover:border-slate-500/60 hover:text-slate-200'
-                }`}
-              >
-                {option.label}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
       {viewIsLoading && (
         <article className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-8 text-sm text-slate-400">
           Loading analytics…
@@ -490,20 +461,50 @@ export function YouTubeAnalyticsView({ platform, isLoading, hasErrors, errorMess
           </section>
 
           <section className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-8">
-            <header className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold tracking-tight text-white">
-                  {platform === 'youtube' ? 'YouTube' : 'Instagram'}{' '}
-                  {selectedMetric === 'views'
-                    ? 'View'
-                    : selectedMetric === 'likes'
-                      ? 'Like'
-                      : selectedMetric === 'comments'
-                        ? 'Comment'
-                        : 'Follower'}{' '}
-                  Trend
-                </h2>
-                <p className="text-xs text-slate-500">
+            <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div className="flex-1">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <h2 className="text-lg font-semibold tracking-tight text-white">
+                    {platform === 'youtube' ? 'YouTube' : 'Instagram'}{' '}
+                    {selectedMetric === 'views'
+                      ? 'View'
+                      : selectedMetric === 'likes'
+                        ? 'Like'
+                        : selectedMetric === 'comments'
+                          ? 'Comment'
+                          : 'Follower'}{' '}
+                    Trend
+                  </h2>
+                  <div className="flex gap-2 text-[0.7rem] tracking-[0.35em]">
+                    {RANGE_OPTIONS.map((option) => {
+                      const isActive = option.id === selectedRange.id
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          aria-pressed={isActive}
+                          onClick={() => setSelectedRange(option)}
+                          className={`rounded-full border px-3 py-1 transition ${
+                            isActive
+                              ? 'border-emerald-500/70 bg-emerald-500/20 text-emerald-100'
+                              : 'border-slate-700/60 text-slate-400 hover:border-slate-500/60 hover:text-slate-200'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                {(summarySource?.updatedAt || platform) && (
+                  <div className="mt-2 flex flex-wrap gap-4 text-xs uppercase tracking-[0.25em] text-slate-500">
+                    {summarySource?.updatedAt && (
+                      <span>Updated {new Date(summarySource.updatedAt).toLocaleDateString()}</span>
+                    )}
+                    <span>{platform.toUpperCase()}</span>
+                  </div>
+                )}
+                <p className="mt-2 text-xs text-slate-500">
                   Showing the last {selectedRange.label} window · {chartData.length} daily snapshots
                   {selectedMetric === 'followers'
                     ? ' for account-level metrics'

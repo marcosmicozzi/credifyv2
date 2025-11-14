@@ -1,7 +1,8 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 
 import { useAuth } from '../../providers/AuthProvider'
+import { useInstagramIntegrationStatus } from '../../hooks/api/integrations'
 
 const navItems = [
   { label: 'Dashboard', to: '/' },
@@ -16,6 +17,7 @@ const badgeClasses =
 
 export function RootLayout() {
   const { user, signOut } = useAuth()
+  const instagramStatus = useInstagramIntegrationStatus()
 
   const userInitials = useMemo(() => {
     const source = user?.name ?? user?.email ?? ''
@@ -34,15 +36,40 @@ export function RootLayout() {
     return initials.toUpperCase() || 'CR'
   }, [user?.email, user?.name])
 
+  const profilePictureUrl = instagramStatus.data?.profilePictureUrl ?? null
+  const hasInstagramProfile = instagramStatus.data?.connected && profilePictureUrl
+  const [imageError, setImageError] = useState(false)
+
+  // Reset image error when profile picture URL changes
+  useEffect(() => {
+    setImageError(false)
+  }, [profilePictureUrl])
+
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-slate-930 to-slate-900 text-slate-100">
       <div className="grid h-screen lg:grid-cols-[18rem_1fr]">
         <aside className="hidden h-screen border-r border-slate-900/80 bg-slate-950/90 lg:flex lg:flex-col lg:overflow-y-auto">
-          <div className="flex items-center justify-between px-6 py-6">
+          <div className="flex items-center justify-between px-6 pt-6 pb-6">
             <span className="text-lg font-semibold tracking-tight text-slate-100">CredifyV2</span>
             <span className={badgeClasses}>{user?.isDemo ? 'demo' : 'beta'}</span>
           </div>
-          <nav className="mt-4 flex flex-1 flex-col gap-2 px-4">
+          <div className="flex justify-center px-6 pb-5">
+            <div className="relative h-32 w-32 overflow-hidden rounded-full border-2 border-slate-800 bg-slate-900 shadow-lg">
+              {hasInstagramProfile && !imageError ? (
+                <img
+                  src={profilePictureUrl}
+                  alt="Profile"
+                  className="h-full w-full object-cover"
+                  onError={() => {
+                    setImageError(true)
+                  }}
+                />
+              ) : (
+                <div className="h-full w-full bg-slate-800/50" />
+              )}
+            </div>
+          </div>
+          <nav className="mt-3 flex flex-1 flex-col gap-2 px-4">
             {navItems.map((item) => (
               <NavLink
                 key={item.to}

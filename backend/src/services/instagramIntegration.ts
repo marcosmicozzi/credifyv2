@@ -734,8 +734,31 @@ export async function getInstagramStatus(userId: string) {
       connected: false,
       accountId: null,
       accountUsername: null,
+      profilePictureUrl: null,
       expiresAt: null,
       updatedAt: null,
+    }
+  }
+
+  // Fetch profile picture URL from Instagram Graph API
+  let profilePictureUrl: string | null = null
+  if (tokenRow.account_id && tokenRow.access_token && !isTokenExpired(tokenRow.expires_at)) {
+    try {
+      const accountUrl = `${INSTAGRAM_GRAPH_API_BASE}/${tokenRow.account_id}`
+      const accountParams = new URLSearchParams({
+        fields: 'profile_picture_url',
+        access_token: tokenRow.access_token,
+      })
+
+      const accountResponse = await fetch(`${accountUrl}?${accountParams.toString()}`)
+
+      if (accountResponse.ok) {
+        const accountData = (await accountResponse.json()) as { profile_picture_url?: string }
+        profilePictureUrl = accountData.profile_picture_url ?? null
+      }
+    } catch (error) {
+      // Log but don't fail the status check if profile picture fetch fails
+      console.warn('Failed to fetch Instagram profile picture:', error)
     }
   }
 
@@ -743,6 +766,7 @@ export async function getInstagramStatus(userId: string) {
     connected: true,
     accountId: tokenRow.account_id,
     accountUsername: tokenRow.account_username,
+    profilePictureUrl,
     expiresAt: tokenRow.expires_at,
     updatedAt: tokenRow.updated_at ?? null,
   }
