@@ -16,9 +16,6 @@ const navItems = [
   { label: 'Tutorial', to: '/tutorial' },
 ]
 
-const badgeClasses =
-  'inline-flex items-center rounded-full border border-slate-700/60 bg-slate-900/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.25em] text-slate-400'
-
 export function RootLayout() {
   const { user, signOut } = useAuth()
   const instagramStatus = useInstagramIntegrationStatus()
