@@ -4,7 +4,6 @@ import { usePlatformMetrics, useMetricsSummary, useInstagramAccountInsights } fr
 
 const numberFormatter = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 })
 const percentFormatter = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 2 })
-const fullNumberFormatter = new Intl.NumberFormat('en-US')
 
 type RangeOptionId = '12M' | '1M' | '7D'
 
@@ -564,57 +563,6 @@ export function YouTubeAnalyticsView({ platform, isLoading, hasErrors, errorMess
                 No {platform === 'youtube' ? 'YouTube' : 'Instagram'}{' '}
                 {selectedMetric === 'followers' ? 'follower' : selectedMetric} metrics available yet. Metrics
                 populate automatically once data arrives from Supabase.
-              </p>
-            )}
-          </section>
-
-          <section className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-8">
-            <header className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <h2 className="text-lg font-semibold tracking-tight text-white">Latest Daily Snapshot</h2>
-              {latestSnapshot?.fetchedAt && (
-                <span className="text-xs uppercase tracking-[0.28em] text-slate-500">
-                  Captured {new Date(latestSnapshot.fetchedAt).toLocaleString()}
-                </span>
-              )}
-            </header>
-
-            {latestSnapshot ? (
-              <dl className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                <div className="rounded-xl border border-slate-800/70 bg-slate-950/50 p-4">
-                  <dt className="text-xs uppercase tracking-[0.25em] text-slate-500">Lifetime Views</dt>
-                  <dd className="mt-2 text-xl font-semibold text-white">
-                    {fullNumberFormatter.format(latestDaily?.lifetimeViews ?? latestSnapshot.viewCount ?? 0)}
-                  </dd>
-                </div>
-                <div className="rounded-xl border border-slate-800/70 bg-slate-950/50 p-4">
-                  <dt className="text-xs uppercase tracking-[0.25em] text-slate-500">Views (24h)</dt>
-                  <dd className="mt-2 text-xl font-semibold text-white">
-                    {fullNumberFormatter.format(latestDaily?.dailyViews ?? 0)}
-                  </dd>
-                </div>
-                <div className="rounded-xl border border-slate-800/70 bg-slate-950/50 p-4">
-                  <dt className="text-xs uppercase tracking-[0.25em] text-slate-500">Engagement Rate</dt>
-                  <dd className="mt-2 text-xl font-semibold text-white">
-                    {formatPercentValue(latestSnapshot.engagementRate)}
-                  </dd>
-                </div>
-                <div className="rounded-xl border border-slate-800/70 bg-slate-950/50 p-4">
-                  <dt className="text-xs uppercase tracking-[0.25em] text-slate-500">Total Likes</dt>
-                  <dd className="mt-2 text-xl font-semibold text-white">
-                    {fullNumberFormatter.format(latestSnapshot.likeCount ?? 0)}
-                  </dd>
-                </div>
-                <div className="rounded-xl border border-slate-800/70 bg-slate-950/50 p-4">
-                  <dt className="text-xs uppercase tracking-[0.25em] text-slate-500">Total Comments</dt>
-                  <dd className="mt-2 text-xl font-semibold text-white">
-                    {fullNumberFormatter.format(latestSnapshot.commentCount ?? 0)}
-                  </dd>
-                </div>
-              </dl>
-            ) : (
-              <p className="mt-6 text-sm text-slate-400">
-                Once {platform === 'youtube' ? 'YouTube' : 'Instagram'} metrics sync, the latest daily snapshot will
-                appear here with engagement detail.
               </p>
             )}
           </section>
