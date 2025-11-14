@@ -26,7 +26,7 @@ type ImpactByRoleProps = {
 
 export function ImpactByRole({ platform }: ImpactByRoleProps) {
   const [groupBy, setGroupBy] = useState<'role' | 'category'>('role')
-  const [metric, setMetric] = useState<'views' | 'likes' | 'comments' | 'projects'>('views')
+  const [metric, setMetric] = useState<'views' | 'likes' | 'comments' | 'projects'>('projects')
   const [dateRange, setDateRange] = useState<'7d' | '28d' | '90d' | 'all'>('all')
   const [mode, setMode] = useState<'full' | 'share_weighted'>('full')
 
@@ -173,7 +173,9 @@ export function ImpactByRole({ platform }: ImpactByRoleProps) {
     <article className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-8">
       <header className="mb-6 flex flex-col gap-4">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight text-white">Impact by Role</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-white">
+            Impact by Role{platform !== 'all' ? ` (${platform.charAt(0).toUpperCase() + platform.slice(1)})` : ''}
+          </h2>
           <p className="mt-1 text-xs text-slate-500">
             Distribution of {metric} across your {groupBy === 'role' ? 'roles' : 'categories'}
           </p>
